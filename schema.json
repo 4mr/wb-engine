@@ -1,0 +1,650 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "title": "WB Engine Configuration",
+    "description": "Configuration of WB Engine and HomeAssistant integration",
+    "options": {
+        "disable_edit_json": true,
+        "disable_properties": true,
+        "disable_collapse": true
+    },
+    "configFile": {
+        "path": "/etc/wb-rules/wb-engine.conf",
+        "service": "wb-rules",
+        "toJSON": ["/usr/bin/wb-engine-helper", "--json"],
+        "fromJSON": ["/usr/bin/wb-engine-helper", "--conf"]
+    },
+    "properties": {
+        "dict": {
+            "type": "object",
+            "options": {
+                "hidden": true
+            }
+        },
+        "devices_config": {
+            "type": "array",
+            "title": "Devices",
+            "_format": "tabs",
+            "propertyOrder": 1,
+            "items": {
+                "$ref": "#/definitions/devices"
+            },
+            "options": {
+                // "collapsed": true,
+
+                "disable_collapse": false,
+                "disable_array_delete": true,
+                "disable_array_add": true,
+                "disable_array_reorder": true
+            }
+        },
+        "scripts": {
+            "type": "array",
+            "title": "List of Scripts",
+            "_format": "tabs",
+            "propertyOrder": 2,
+            "items": {
+                "$ref": "#/definitions/script"
+            },
+            "options": {
+                "enable_array_copy": true,
+                "disable_collapse": false,
+                "disable_array_delete": false,
+                "disable_array_add": false,
+                "disable_array_reorder": false,
+                "disable_array_delete_last_row": true
+            }
+        }
+    },
+    "definitions": {
+        "devices": {
+            "headerTemplate": "{{self.name}}",
+            "allOf": [
+                {"$ref": "#/definitions/deviceSettings"},
+                {"$ref": "#/definitions/commonSettings"}
+            ],
+            "options": {
+                "disable_edit_json": true,
+                "disable_collapse": true,
+                "wb": {
+                    "disable_title": true
+                }
+            }
+        },
+        "controls": {
+            "allOf": [
+                {"$ref": "#/definitions/controlSettings"},
+                {"$ref": "#/definitions/commonSettings"}
+            ]
+        },
+        "commonSettings": {
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "options": {
+                        "hidden": true
+                    }
+                },
+                "name": {
+                    "options": {
+                        "hidden": true
+                    }
+                }
+            }
+        },
+        "deviceSettings": {
+            "type": "object",
+            "_format": "grid",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "options": {
+                        "hidden": true
+                    }
+                },
+                "custom_name": {
+                    "type": "string",
+                    "title": "Custom device name",
+                    "propertyOrder": 20,
+                    "options": {
+                        "grid_columns": 6,
+                        "show_opt_in": true
+                    }
+                },
+                "dooya_create_control": {
+                    "type": "boolean",
+                    "title": "Create cover in HomeAssistant",
+                    "default": false,
+                    "_format": "checkbox",
+                    "propertyOrder": 11,
+                    "options": {
+                        "grid_columns": 4
+                    }
+                },
+                "dooya_cover_class": {
+                    "type": "string",
+                    "title": "Cover class",
+                    "default": "curtain",
+                    "propertyOrder": 12,
+                    "options": {
+                        "dependencies": {
+                            "dooya_create_control": true
+                        },
+                        "grid_columns": 8
+                    },
+                    "watch": {
+                        "cover_class": "root.dict.cover_class"
+                    },
+                    "enumSource": [
+                        {"source": "cover_class", "title": "{{item}}", "value": "{{item}}"}
+                    ]
+                },
+                "controls": {
+                    "type": "array",
+                    "title": "Controls",
+                    "_format": "tabs",
+                    "items": {
+                        "$ref": "#/definitions/controls"
+                    },
+                    "propertyOrder": 40,
+                    "options": {
+                        "disable_collapse": true,
+                        "disable_array_delete": true,
+                        "disable_array_add": true,
+                        "disable_array_reorder": true,
+                        "grid_columns": 12,
+                        "wb": {
+                            "disable_title": true
+                        }
+                    }
+                }
+            }
+        },
+        "controlSettings": {
+            "type": "object",
+            "_format": "grid",
+            "headerTemplate": "control_header_template",
+            "id": "control_item",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "title": "Add control to HomeAssistant",
+                    "default": false,
+                    "_format": "checkbox",
+                    "propertyOrder": 1,
+                    "options": {
+                        "grid_columns": 12
+                    }
+                },
+                "hass_id": {
+                    "type": "string",
+                    "title": "HomeAssistant ID",
+                    "propertyOrder": 2,
+                    "options": {
+                        "show_opt_in": true,
+                        "grid_columns": 12
+                    }
+                },
+                "custom_name": {
+                    "type": "string",
+                    "title": "Custom Name",
+                    "propertyOrder": 3,
+                    "options": {
+                        "show_opt_in": true,
+                        "grid_columns": 12
+                    }
+                },
+                "add_value": {
+                    "type": "number",
+                    "title": "Add Value",
+                    "propertyOrder": 4,
+                    "default": 0,
+                    "pattern" : "^(|-)([0-9\\.]+)$",
+                    "options": {
+                        "grid_columns": 4,
+                        "patternmessage": "Only numbers"
+                    }
+                },
+                "pulse_count": {
+                    "type": "integer",
+                    "title": "Pulse Count",
+                    "description": "How many litres per impulse",
+                    "propertyOrder": 4,
+                    "default": 1,
+                    "minimum": 1,
+                    "options": {
+                        "grid_columns": 4
+                    }
+                },
+                "type": {
+                    "type": "string",
+                    "title": "Control type",
+                    "propertyOrder": 4,
+                    "watch": {
+                        "list": "control_item.types"
+                    },
+                    "enumSource": [
+                        {
+                            "source": "list",
+                            "title": "{{item}}",
+                            "value": "{{item}}"
+                        }
+                    ],
+                    "options": {
+                        "grid_columns": 4
+                    }
+                },
+                "types": {
+                    "type": "array",
+                    "options": {
+                        "hidden": true
+                    }
+                },
+                "motion_level": {
+                    "title": "Motion Level",
+                    "type": "string",
+                    "default": "100",
+                    "propertyOrder": 6
+                }
+            },
+            "options": {
+                "disable_edit_json": true,
+                "disable_collapse": true,
+                "wb": {
+                    "disable_title": true,
+                    "disable_panel": true
+                }
+            }
+        },
+
+        "script": {
+            "_format": "wb-multiple",
+            "title": "Script",
+            "headerTemplate" : "script_header_template",
+            "oneOf": [
+                {"$ref": "#/definitions/thermostatScript"},
+                {"$ref": "#/definitions/motionScript"}
+            ],
+            "defaultProperties": ["script_type"],
+            "options": {
+                "disable_collapse": true,
+                "disable_properties": true,
+                "disable_edit_json": true,
+                "keep_oneof_values": false
+            }
+        },
+
+        "commonScriptSettings": {
+            "properties": {
+                "enabled": {
+                    "_format": "checkbox",
+                    "default": true,
+                    "options": {
+                        "grid_columns": 12
+                    },
+                    "propertyOrder": 10,
+                    "title": "Enable Script",
+                    "type": "boolean"
+                },
+                "name": {
+                    "minLength": 1,
+                    "options": {
+                        "grid_columns": 6,
+                        "patternmessage": "Valid: letters (a-z), numbers, period, hypen, underline"
+                    },
+                    "pattern" : "^[a-zA-Z0-9\\.\\-_ ]+$",
+                    "propertyOrder": 30,
+                    "title": "Script name",
+                    "type": "string"
+                },
+                "title": {
+                    "minLength": 1,
+                    "options": {
+                        "grid_columns": 6,
+                        "show_opt_in": true
+                    },
+                    "propertyOrder": 32,
+                    "title": "Script title",
+                    "type": "string"
+                }
+            }
+        },
+
+        "thermostatScript": {
+            "_format": "grid",
+            "allOf": [
+                {"$ref": "#/definitions/thermostatSettings"},
+                {"$ref": "#/definitions/commonScriptSettings"}
+            ],
+            "properties":  {
+                "script_type": {
+                    "title": "Script Type",
+                    "default": "thermostat",
+                    "enum": ["thermostat"],
+                    "options": {"hidden": true},
+                    "propertyOrder": 1,
+                    "type": "string"
+                }
+            },
+            "required": ["script_type"],
+            "options": {
+                "keep_oneof_values": false,
+                "wb": {"disable_panel": true}
+            },
+           "title": "Thermostat",
+            "type": "object"
+        },
+        "thermostatSettings": {
+            "_format": "grid",
+            "title": "Thermostat",
+            "type": "object",
+            "properties":  {
+                "hass_enabled": {
+                    "_format": "checkbox",
+                    "default": false,
+                    "options": {
+                        "grid_columns": 12
+                    },
+                    "propertyOrder": 20,
+                    "title": "Add Script to HomeAssistant",
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string",
+                    "title": "Work mode",
+                    "propertyOrder": 21,
+                    "default": "heat",
+                    "options": {
+                        "grid_columns": 6
+                    },
+                    "watch": {
+                        "thermostat_modes": "root.dict.thermostat_modes"
+                    },
+                    "enumSource": [
+                        {"source": "thermostat_modes", "title": "{{item}}", "value": "{{item}}"}
+                    ]
+                },
+                "inverted_control": {
+                    "_format": "checkbox",
+                    "default": false,
+                    "options": {
+                        "grid_columns": 6
+                    },
+                    "propertyOrder": 22,
+                    "title": "Relay inverted control",
+                    "type": "boolean"
+                },
+                "temperature_target": {
+                    "options": {
+                        "grid_columns": 2
+                    },
+                    "default": 20,
+                    "propertyOrder": 40,
+                    "title": "Target temperature",
+                    "type": "integer"
+                },
+                "temperature_min": {
+                    "options": {
+                        "grid_columns": 2
+                    },
+                    "default": 20,
+                    "propertyOrder": 40,
+                    "title": "Minimum temperature",
+                    "type": "integer"
+                },
+                "temperature_max": {
+                    "options": {
+                        "grid_columns": 2
+                    },
+                    "default": 30,
+                    "propertyOrder": 50,
+                    "title": "Maximum temperature",
+                    "type": "integer"
+                },
+                "hysteresis": {
+                    "options": {
+                        "grid_columns": 2
+                    },
+                    "default": 0.5,
+                    "propertyOrder": 60,
+                    "title": "Hysteresis",
+                    "type": "number"
+                },
+                "zones": {
+                    "format": "table",
+                    "items": {
+                        "$ref": "#/definitions/thermostatZoneSettings"
+                    },
+                    "options": {
+                        "grid_columns": 12,
+                        "array_controls_top": true,
+                        "disable_array_delete_last_row": true,
+                        "disable_array_reorder": true,
+                        "disable_collapse": true,
+                        "enable_array_copy": false,
+                        "wb": {"disable_panel": true}
+                    },
+                    "propertyOrder": 70,
+                    "headerTemplate": "Thermostat zones",
+                    "title": "Zones",
+                    "type": "array"
+                }
+            },
+            "options": {
+                "wb": {"disable_panel": true}
+            },
+            "defaultProperties": ["script_type", "enabled", "hass_enabled", "mode", "inverted_control", "name", "title", "temperature_target", "temperature_min", "temperature_max", "hysteresis", "zones"]
+        },
+        "thermostatZoneSettings": {
+            "title": "Zone",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "title": "Name",
+                    "propertyOrder": 2,
+                    "options": {
+                        "grid_columns": 1,
+                        "inputAttributes": {"placeholder":  "(optional)"}
+                    }
+                },
+                "sensor": {
+                    "type": "string",
+                    "title": "Temperature Sensor",
+                    "watch": {
+                        "temperature": "root.dict.temperature",
+                        "temperature_state": "root.dict.temperature_state"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Disabled", "value": "disabled"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "temperature", "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "temperature_state", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "default": "disabled",
+                    "propertyOrder": 3,
+                    "options": {"grid_columns": 2}
+                },
+                "relay": {
+                    "type": "string",
+                    "title": "Switch Relay",
+                    "watch": {
+                        "switch": "root.dict.switch",
+                        "light": "root.dict.light"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Disabled", "value": "disabled"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "switch", "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "light", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "default": "disabled",
+                    "propertyOrder": 4,
+                    "options": {"grid_columns": 2}
+                }
+            }
+        },
+
+        "motionScript": {
+            "_format": "grid",
+            "allOf": [
+                {"$ref": "#/definitions/motionSettings"},
+                {"$ref": "#/definitions/commonScriptSettings"}
+            ],
+            "properties":  {
+                "script_type": {
+                    "title": "Script Type",
+                    "default": "motion",
+                    "enum": ["motion"],
+                    "options": {"hidden": true},
+                    "propertyOrder": 1,
+                    "type": "string"
+                }
+            },
+            "required": ["script_type"],
+            "options": {
+                "keep_oneof_values": false,
+                "wb": {"disable_panel": true}
+            },
+            "title": "Motion",
+            "type": "object"
+        },
+        "motionSettings": {
+            "_format": "grid",
+            "title": "Motion",
+            "type": "object",
+            "properties":  {
+                "wait_time": {
+                    "title": "Wait time",
+                    "description": "Time to leave the relay on after last motion is detected",
+                    "type": "integer",
+                    "default": 120,
+                    "propertyOrder": 60,
+                    "options": {
+                        "grid_columns": 12
+                    },
+                    "minimum": 10,
+                    "maximum": 86400
+                },
+                "sensors": {
+                    "format": "table",
+                    "items": {
+                        "$ref": "#/definitions/motionSensorSettings"
+                    },
+                    "options": {
+                        "grid_columns": 6,
+                        "array_controls_top": true,
+                        "disable_array_delete_last_row": true,
+                        "disable_array_reorder": true,
+                        "disable_collapse": true,
+                        "enable_array_copy": false,
+                        "wb": {"disable_panel": true}
+                    },
+                    "propertyOrder": 70,
+                    "headerTemplate": "Motion sensors",
+                    "title": "Sensor",
+                    "type": "array"
+                },
+                "relays": {
+                    "format": "table",
+                    "items": {
+                        "$ref": "#/definitions/motionRelaySettings"
+                    },
+                    "options": {
+                        "grid_columns": 6,
+                        "array_controls_top": true,
+                        "disable_array_delete_last_row": true,
+                        "disable_array_reorder": true,
+                        "disable_collapse": true,
+                        "enable_array_copy": false,
+                        "wb": {"disable_panel": true}
+                    },
+                    "propertyOrder": 75,
+                    "headerTemplate": "Motion relays",
+                    "title": "Relay",
+                    "type": "array"
+                }
+            },
+            "options": {
+                "keep_oneof_values": false,
+                "wb": {"disable_panel": true}
+            },
+            "defaultProperties": ["script_type", "enabled", "name", "title", "wait_time", "sensors", "relays"]
+        },
+        "motionSensorSettings": {
+            "title": "Sensor",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "title": "Name",
+                    "propertyOrder": 2,
+                    "options": {
+                        "grid_columns": 1,
+                        "inputAttributes": {"placeholder":  "(optional)"}
+                    }
+                },
+                "sensor": {
+                    "type": "string",
+                    "title": "Sensor",
+                    "watch": {
+                        "motion": "root.dict.motion",
+                        "motion_state": "root.dict.motion_state"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Disabled", "value": "disabled"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "motion", "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "motion_state", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "default": "disabled",
+                    "propertyOrder": 3,
+                    "options": {"grid_columns": 2}
+                },
+                "motion_level": {
+                    "type": "number",
+                    "title": "Motion level",
+                    "default": 100,
+                    "propertyOrder": 4
+                }
+            }
+        },
+        "motionRelaySettings": {
+            "title": "Relay",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "title": "Name",
+                    "propertyOrder": 2,
+                    "options": {
+                        "grid_columns": 1,
+                        "inputAttributes": {"placeholder":  "(optional)"}
+                    }
+                },
+                "relay": {
+                    "type": "string",
+                    "title": "Relay",
+                    "watch": {
+                        "switch": "root.dict.switch",
+                        "light": "root.dict.light"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Disabled", "value": "disabled"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "switch", "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "light", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "default": "disabled",
+                    "propertyOrder": 3,
+                    "options": {"grid_columns": 2}
+                }
+            }
+        }
+    },
+
+    "translations": {
+        "en": {
+            "control_header_template": "{{self.id}}",
+            "script_header_template": "{{self.name}}"
+        },
+        "ru": {
+            "control_header_template": "{{self.id}}",
+            "script_header_template": "{{self.name}}"
+        }
+    }
+}

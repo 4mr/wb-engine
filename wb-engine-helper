@@ -1,0 +1,782 @@
+#!/usr/bin/env python3
+
+import sys
+import json
+import os
+import time
+import re
+import codecs
+from functools import reduce
+from paho.mqtt import client as mqtt
+from pprint import pprint
+
+broker = 'localhost'
+port = 1883
+readingItems = True
+readTimeout = 60
+hass_base_topic = 'homeassistant/'
+
+file_config = '/etc/wb-rules/wb-engine.conf'
+file_config_devices = '/etc/wb-rules/wb-engine.devices.conf'
+
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+
+def load_json(filename):
+    try:
+        if os.path.exists(filename):
+            fp = open(filename, "r")
+            content = fp.read()
+            fp.close()
+            return json.loads(content)
+    except:
+        pass
+    return {}
+
+mqtt = mqtt.Client()
+
+devices = {}
+devices_ha = {}
+
+config = load_json(file_config)
+config_devices = load_json(file_config_devices)
+
+valid = config_devices['valid'] if 'valid' in config_devices else {}
+default_config = config_devices['devices']['default'] if ('devices' in config_devices) else {}
+
+def mqtt_on_subscribe(client, userdata, mid, granted_qos):
+    client.publish('/tmp/items_list', 'end_reading')
+
+def mqtt_on_connect(client, userdata, flags, rc):
+    client.subscribe([
+        ("/devices/+/meta", 0),
+        ("/devices/+/meta/+", 0),
+        ('/devices/+/controls/+/meta', 0),
+        ('/devices/+/controls/+/meta/+', 0),
+        (hass_base_topic + '+/+/+/config', 0),
+        ('/tmp/items_list', 0)
+    ])
+
+def mqtt_on_message(client, userdata, msg):
+    global readingItems
+
+    if (readingItems == False): return
+
+    if (msg.topic == '/tmp/items_list'):
+        readingItems = False
+        client.unsubscribe([
+            '/devices/+/meta',
+            '/devices/+/meta/+',
+            '/devices/+/controls/+/meta',
+            '/devices/+/controls/+/meta/+',
+            hass_base_topic + '+/+/+/config',
+            '/tmp/items_list'
+        ])
+        return
+
+    topicParts = msg.topic.split('/')
+
+    if (topicParts[0] == 'homeassistant'):
+        parseHA(topicParts, msg)
+
+    if (topicParts[0] == '' and topicParts[1] == 'devices'):
+        parseWB(topicParts, msg)
+
+def mqtt_publish(topic, data):
+    mqtt.publish(topic, data, qos=0, retain=True)
+    time.sleep(0.05)
+
+def parseHA(topicParts, msg):
+    if (topicParts[1] not in devices_ha):
+        devices_ha[topicParts[1]] = {}
+    if (topicParts[2] not in devices_ha[topicParts[1]]):
+        devices_ha[topicParts[1]][topicParts[2]] = {}
+    devices_ha[topicParts[1]][topicParts[2]][topicParts[3]] = json.loads(msg.payload.decode("utf-8"))
+
+def parseWB(topicParts, msg):
+    topicPartsSize = len(topicParts)
+    deviceName = topicParts[2]
+
+    # /devices/+/meta
+    if (topicParts[3] == 'meta' and topicPartsSize == 4):
+        if (deviceName not in devices):
+            devices[deviceName] = {"id": deviceName}
+        if (len(msg.payload) > 0):
+            meta = json.loads(msg.payload.decode("utf-8"))
+            for key in meta:
+                if (key in valid['device_meta']):
+                    devices[deviceName][key] = meta[key]
+
+    # /devices/+/meta/+
+    elif (topicParts[3] == 'meta' and topicPartsSize > 4):
+        if (deviceName not in devices):
+            devices[deviceName] = {"id": deviceName}
+        if (topicParts[4] in valid['device_meta']):
+            devices[deviceName][topicParts[4]] = msg.payload.decode("utf-8")
+
+    elif (topicParts[3] == 'controls' and topicParts[5] == 'meta'):
+        controlName = topicParts[4]
+        if ('controls' not in devices[deviceName]):
+            devices[deviceName]['controls'] = {}
+        if (controlName not in devices[deviceName]['controls']):
+            devices[deviceName]['controls'][controlName] = {
+                "id": controlName, "name": controlName
+            }
+
+        # /devices/+/controls/+/meta
+        if (topicPartsSize == 6):
+            meta = json.loads(msg.payload.decode("utf-8"))
+            for key in meta:
+                if (key == 'title'):
+                    if ('en' in meta[key]):
+                        devices[deviceName]['controls'][controlName]['name'] = meta[key]['en']
+                    elif ('ru' in meta[key]):
+                        devices[deviceName]['controls'][controlName]['name'] = meta[key]['ru']
+                    continue
+                if (key in valid['control_meta']):
+                    devices[deviceName]['controls'][controlName][key] = meta[key]
+        else:
+            # /devices/+/controls/+/meta/+
+            if (topicParts[6] in valid['control_meta']):
+                devices[deviceName]['controls'][controlName][topicParts[6]] = msg.payload.decode("utf-8")
+
+def loadDevices():
+    global readingItems
+    readingItems = True
+
+    mqtt.on_connect = mqtt_on_connect
+    mqtt.on_message = mqtt_on_message
+    mqtt.on_subscribe = mqtt_on_subscribe
+    mqtt.connect(broker, port)
+    mqtt.loop_start()
+
+    start = time.time()
+    while readingItems:
+        time.sleep(0.1)
+        if (time.time() - start > readTimeout):
+            break
+
+    return
+
+def getByID(list, id):
+    for item in list:
+        if ('id' in item and item['id'] == id):
+            return item
+    return False
+
+def fix(text):
+    repls = ('(', ''), (')', '')
+    return re.sub('[^a-zA-Z0-9-]+', '_', reduce(lambda a, kv: a.replace(*kv), repls, text.lower()))
+
+def toJson():
+    try:
+        data = sys.stdin.read()
+        config = {}
+        if (data != ""): config = json.loads(data)
+    except:
+        print('Invalid JSON', file=sys.stderr)
+        sys.exit(1)
+
+    loadDevices()
+
+    filter = []
+    for key in devices:
+        if ('driver' in devices[key] and devices[key]['driver'] in valid['drivers']): continue
+        filter.append(key)
+
+    for key in filter: del devices[key]
+
+    config_temp = {'devices_config': []}
+
+    if ('devices_config' not in config): config['devices_config'] = []
+
+    default_config = config_devices['devices']['default']
+    config_temp['scripts'] = config['scripts'] if ('scripts' in config) else []
+    config_temp['dict'] = {}
+    config_temp['dict']['cover_class'] = ['awning', 'blind', 'curtain', 'damper', 'door', 'garage', 'gate', 'shade', 'shutter', 'window']
+    config_temp['dict']['thermostat_modes'] = ['heat', 'cool']
+
+    for key, script in enumerate(config_temp['scripts']):
+        if (config_temp['scripts'][key]['script_type'] == 'thermostat'):
+            if ('mode' not in config_temp['scripts'][key]):
+                config_temp['scripts'][key]['mode'] = 'heat'
+            if ('temperature_target' not in config_temp['scripts'][key]):
+                config_temp['scripts'][key]['temperature_target'] = config_temp['scripts'][key]['temperature_min']
+
+    for key in sorted(devices.keys()):
+        device = devices[key]
+        if ('id' not in device): continue
+        if ('name' not in device): continue
+        if ('controls' not in device): continue
+
+        if ('ignore_devices' in config_devices):
+            for test in config_devices['ignore_devices']:
+                if (device and re.search(test, device['id'])): device = False
+
+        if (device == False): continue
+
+        file_device = getByID(config['devices_config'], device['id'])
+
+        newDevice = {'id': device['id'], 'name': device['name'], 'enabled': False, 'controls': []}
+        id = device['id'].split('_')[0]
+
+        if (file_device):
+            for key in config_devices['valid']['device']['keys']:
+                if (key in file_device): newDevice[key] = file_device[key]
+
+        device_config = False
+        if (id in config_devices['devices']):
+            if ('alias' in config_devices['devices'][id]): id = config_devices['devices'][id]['alias']
+            device_config = config_devices['devices'][id]
+
+        if (device_config and 'settings' in device_config):
+            for key in device_config['settings']:
+                if (key not in newDevice):
+                    newDevice[key] = device_config['settings'][key]
+
+        for key in sorted(device['controls'].keys()):
+            control = device['controls'][key]
+
+            control_type = control['type'] if ('type' in control) else False
+
+            file_control = False
+            if (file_device): file_control = getByID(file_device['controls'], control['id'])
+
+            newControl = {'id': control['id'], 'name': control['name'], 'enabled': False}
+
+            if (device_config):
+                if ('ignore' in default_config):
+                    for test in default_config['ignore']:
+                        if (re.search(test, control['id'])): newControl = False
+
+                if ('ignore' in device_config):
+                    for test in device_config['ignore']:
+                        if (re.search(test, control['id'])): newControl = False
+
+                if (newControl):
+                    for test in device_config['controls']:
+                        if (not re.search(test, control['id'])): continue
+                        if ('type' in device_config['controls'][test]):
+                            control_type = device_config['controls'][test]['type']
+                        if ('settings' not in device_config['controls'][test]): continue
+                        for key in device_config['controls'][test]['settings']:
+                            newControl[key] = device_config['controls'][test]['settings'][key]
+
+            if (newControl == False): continue
+
+            if (file_control):
+                for key in config_devices['valid']['device']['control_keys']:
+                    if (key in file_control): newControl[key] = file_control[key]
+
+            if ('readonly' in control and control['readonly'] == '1'): control_type = control_type + '_state'
+            if (control_type not in config_temp['dict']): config_temp['dict'][control_type] = []
+
+            title = ' / '.join([
+                newDevice['custom_name'] if ('custom_name' in newDevice) else newDevice['name'],
+                newControl['custom_name'] if ('custom_name' in newControl) else newControl['name']
+            ])
+
+            config_temp['dict'][control_type].append({
+                'value': newDevice['id'] + '/' + newControl['id'],
+                'title': title
+            })
+
+            newDevice['controls'].append(newControl)
+
+        config_temp['devices_config'].append(newDevice)
+
+    json.dump(config_temp, sys.stdout, indent=4)
+
+def toConf():
+    data = sys.stdin.read()
+    # fix for double utf8 encoding error
+    data = data.encode('utf8','surrogateescape').decode('utf8','surrogateescape')
+
+    try:
+        config_web = json.loads(data)
+    except:
+        print("Invalid JSON", file=sys.stderr)
+        sys.exit(1)
+
+    temp_config = {
+        'devices_config': []
+    }
+
+    temp_config['scripts'] = []
+    for script in config_web['scripts']:
+        temp_config['scripts'].append(script)
+
+    for device in config_web['devices_config']:
+        newDevice = {}
+        for key in config_devices['valid']['device']['keys']:
+            if (key in device): newDevice[key] = device[key]
+
+        newDevice['controls'] = []
+        for control in device['controls']:
+            newControl = {}
+            for key in config_devices['valid']['device']['control_keys']:
+                if (key in control): newControl[key] = control[key]
+            newDevice['controls'].append(newControl)
+
+        temp_config['devices_config'].append(newDevice)
+
+    json.dump(temp_config, sys.stdout, indent=4)
+
+def hassAdd(device):
+    def test_ignore(control, device):
+        if (device and 'ignore' in device):
+            for test in device['ignore']:
+                if (re.search(test, control['id'])):
+                    return True
+        return False
+
+    def config_apply_search(list, search, opts, replace):
+        for key in list:
+            if (not re.search(key, search)): continue
+            for name in list[key]:
+                if ("settings" in list[key] and name in list[key]["settings"]): continue
+                opts[name] = list[key][name]
+
+                if isinstance(opts[name], str):
+                    for test in replace:
+                        opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
+
+    def config_apply(list, opts, replace):
+        for name in list:
+            if (name in ['default']): continue
+            opts[name] = list[name]
+
+            if (isinstance(opts[name], str)):
+                for test in replace:
+                    opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
+                if ('default' in list):
+                    for test in list['default']:
+                        opts[name] = opts[name].replace("{{" + test + "}}", list['default'][test])
+
+    device_model = device['id'].split('_')[0]
+
+    # todo: check live exists
+    device_live = devices[device['id']]
+    device_driver = device_live['driver']
+
+    device_custom_name = device['custom_name'] if ('custom_name' in device) else device['name']
+    device_hass_model = device_model + " [" + device_driver + "]" if (device_model != device_driver) else device_model
+
+    device_opts = {
+        "identifiers": device['id'],
+        "manufacturer": "WirenBoard",
+        "model": device_hass_model,
+        "name": device_custom_name
+    }
+
+    device_config = False
+    if (device_model in config_devices['devices']):
+        if ('alias' in config_devices['devices'][device_model]):
+            device_config = config_devices['devices'][config_devices['devices'][device_model]['alias']]
+        else:
+            device_config = config_devices['devices'][device_model]
+
+    device_settings = False
+    if (device_config and 'settings' in device_config):
+        device_settings = device_config['settings']
+
+        for key in device_config['settings']:
+            if (not key.endswith('_create_control')): continue
+            if (key not in device): continue
+            if (device[key] == True and key in device_config['controls']):
+                control = device_config['controls'][key]
+                control['enabled'] = True
+                control['name'] = device_custom_name
+                device['controls'].append(control)
+                device_live['controls'][control['id']] = control
+
+    for control in device['controls']:
+        if (control['id'] not in device_live['controls']): continue
+
+        if (test_ignore(control, default_config)): continue
+        if (test_ignore(control, device_config)): continue
+
+        control_live = device_live['controls'][control['id']]
+        control_enabled = control['enabled']
+
+        replace = {
+            'control_id': control['id'],
+            'topic': '/devices/' + device['id'] + '/controls/' + control['id'],
+            'meta_topic': '/devices/' + device['id'] + '/meta/',
+            'base_topic': '/devices/' + device['id'] + '/controls/',
+
+            # default values for range
+            'min': 0,
+            'max': 100
+        }
+
+        if (device_settings):
+            for key in device_settings:
+                if (key not in device): continue
+                if (isinstance(device[key], bool)): continue
+                replace[key] = device[key]
+
+        for key in control:
+            if (isinstance(control[key], bool)): continue
+            replace[key] = control[key]
+
+        for key in control_live:
+            if (isinstance(control_live[key], bool)): continue
+            replace[key] = control_live[key]
+
+        control_opts = {
+            'type': control['type'] if ('type' in control) else control_live['type'],
+            'device': device_opts,
+            'availability_mode': 'latest',
+            'enabled_by_default': True,
+            'availability': [
+                {
+                    'topic': replace['topic'],
+                    'value_template': "{{ False if value == '' else True }}",
+                    'payload_not_available': False,
+                    'payload_available': True
+                },
+                {
+                    'topic': replace['topic'] + '/meta',
+                    'value_template': "{{ False if value == '' else True }}",
+                    'payload_not_available': False,
+                    'payload_available': True
+                },
+                {
+                    'topic': replace['topic'] + '/meta/error',
+                    'value_template': "{{ True if value == '' else False }}",
+                    'payload_not_available': False,
+                    'payload_available': True
+                }
+            ]
+        }
+
+        config_apply_search(default_config['controls'], control['id'], control_opts, replace)
+
+        if (device_config and 'controls' in device_config):
+            config_apply_search(device_config['controls'], control['id'], control_opts, replace)
+
+        if ('readonly' in control_live and control_live['readonly'] == '1'): control_opts['type'] = control_opts['type'] + '_state'
+
+        control_hass_id = control['hass_id'] if ('hass_id' in control) else "_".join([device['id'], control['id']])
+        control_custom_name = control['custom_name'] if ('custom_name' in control) else control['name']
+
+        control_opts['name'] = control_custom_name
+        control_opts['unique_id'] = fix(control_hass_id)
+        control_opts['object_id'] = control_opts['unique_id']
+        control_opts['state_topic'] = replace['topic']
+
+        control_type = control_opts['type']
+
+        if (control_type not in config_devices['types']):
+            if (not control_type.endswith('_state')): continue
+
+            control_type = control_type.replace('_state', '')
+            if (control_type not in config_devices['types']): continue
+
+        config_apply(config_devices['types'][control_type], control_opts, replace)
+
+        if ('disable_availability' in control_opts):
+            del control_opts['disable_availability']
+            del control_opts['availability']
+
+        if ('disable_state_topic' in control_opts):
+            del control_opts['disable_state_topic']
+            del control_opts['state_topic']
+
+        control_type_hass = control_opts['type']
+        del control_opts['type']
+        if ('settings' in control_opts):
+            del control_opts['settings']
+
+        hass_topic = [control_type_hass, fix(device['id']), fix(control['id']), 'config']
+        hassPublish(control_enabled, control_opts, hass_topic)
+
+def hassPublish(control_enabled, control_opts, hass_topic):
+    hass_exists = False
+
+    if (hass_topic[0] in devices_ha
+        and hass_topic[1] in devices_ha[hass_topic[0]]
+        and hass_topic[2] in devices_ha[hass_topic[0]][hass_topic[1]]):
+        hass_exists = True
+
+    topic = hass_base_topic + '/'.join(hass_topic)
+
+    if (control_enabled):
+        # publish
+        if (hass_exists):
+            # delete if id changed
+            hass_state = devices_ha[hass_topic[0]][hass_topic[1]][hass_topic[2]]
+            if ('unique_id' in hass_state and hass_state['unique_id'] != control_opts['unique_id']):
+                mqtt_publish(topic, None)
+
+        mqtt_publish(topic, json.dumps(control_opts))
+
+    elif (hass_exists):
+        # delete
+        mqtt_publish(topic, None)
+
+def initHass():
+    loadDevices()
+
+    for device in config['devices_config']:
+        if (device['id'] not in devices): continue
+
+        hassAdd(device)
+
+def initScriptThermostat(script):
+    device = {'meta': {}, 'controls': {}}
+
+    device_id = 'script_' + fix(script['name'].lower())
+    device_title = script['title'] if 'title' in script else script['name']
+    device['meta']['name'] = device_title
+    device['meta']['title'] = {'en': device_title}
+    device['meta']['driver'] = 'wb-engine'
+    device['controls'] = {}
+
+    device['controls']['enable'] = {
+        'title': {'en': 'Enable', 'ru': 'Enable'},
+        'readonly': False,
+        'type': 'switch',
+        'order': 10,
+        'default': 0
+    }
+
+    device['controls']['state'] = {
+        'title': {'en': 'Mode State', 'ru': 'State'},
+        'type': 'text',
+        'readonly': True,
+        'order': 15,
+        'default': 'off'
+    }
+
+    device['controls']['current'] = {
+        'title': {'en': 'Current Temperature', 'ru': 'Current Temperature'},
+        'type': 'temperature',
+        'readonly': True,
+        'order': 16,
+        'default': 0
+    }
+
+    device['controls']['target'] = {
+        'title': {'en': 'Target Temperature', 'ru': 'Target Temperature'},
+        'min': script['temperature_min'],
+        'max': script['temperature_max'],
+        'readonly': False,
+        'type': 'range',
+        'order': 20,
+        'default': script['temperature_min']
+    }
+
+    order1 = 30
+    order2 = 50
+
+    for idx, zone in enumerate(script['zones']):
+        if (zone['sensor'] == 'disabled' or zone['relay'] == 'disabled'): continue
+
+        title1 = "Zone Temperature"
+        title2 = "Zone Relay Status"
+        if (zone['name'] != ""):
+            title1 = zone['name'] + " Temperature"
+            title2 = zone['name'] + " Relay Status"
+        else:
+            if (len(script['zones']) > 1):
+                title1 = "Zone " + str(idx + 1) + " Temperature"
+                title2 = "Zone " + str(idx + 1) + " Relay Status"
+
+        control_id1 = 'zone' + str(idx+1) + '_status'
+        device['controls'][control_id1] = {
+            'title': {'en': title1, 'ru': title1},
+            'type': 'temperature',
+            'readonly': True,
+            'order': order1,
+            'default': 0
+        }
+
+        control_id2 = 'zone' + str(idx+1) + '_relay_status'
+        device['controls'][control_id2] = {
+            'title': {'en': title2, 'ru': title2},
+            'type': 'switch',
+            'readonly': True,
+            'order': order2,
+            'default': 0
+        }
+
+        order1 = order1 + 1
+        order2 = order2 + 1
+
+    if (script['hass_enabled']):
+        hass_hvac = {
+            'device': {
+                "identifiers": device_id,
+                "manufacturer": "WirenBoard",
+                "model": "termostat [wb-engine]",
+                "name": device_title
+            },
+            'name': device_title,
+            'unique_id': device_id,
+            'object_id': device_id,
+            'modes': ['off', script['mode']],
+            'temperature_unit': 'C',
+            'min_temp': script['temperature_min'],
+            'max_temp': script['temperature_max'],
+            'temp_step': 0.5,
+            'action_topic': '/devices/' + device_id + '/controls/state',
+            'current_temperature_topic': '/devices/' + device_id + '/controls/current',
+            'temperature_state_topic': '/devices/' + device_id + '/controls/target',
+            'temperature_command_topic': '/devices/' + device_id + '/controls/target/on',
+            'power_command_topic': '/devices/' + device_id + '/controls/enable/on',
+            'mode_state_topic': '/devices/' + device_id + '/controls/enable',
+            'mode_state_template': "{{ '" + script['mode'] + "' if value == '1' else 'off' }}",
+            'payload_on': 1,
+            'payload_off': 0
+        }
+
+        hass_topic = ['climate', fix(device_id), 'hvac', 'config']
+        hassPublish(True, hass_hvac, hass_topic)
+
+    wbAddDevice(device_id, device)
+
+def initScriptMotion(script):
+    device = {'meta': {}, 'controls': {}}
+
+    device_id = 'script_' + fix(script['name'].lower())
+    device_title = script['title'] if 'title' in script else script['name']
+    device['meta']['name'] = device_title
+    device['meta']['title'] = {'en': device_title}
+    device['meta']['driver'] = 'wb-engine'
+    device['controls'] = {}
+
+    device['controls']['enable'] = {
+        'title': {'en': 'Enable', 'ru': 'Enable'},
+        'readonly': False,
+        'type': 'switch',
+        'order': 10,
+        'default': 0
+    }
+
+    device['controls']['state'] = {
+        'title': {'en': 'Motion', 'ru': 'Motion'},
+        'type': 'text',
+        'readonly': True,
+        'order': 15,
+        'default': 'off'
+    }
+
+    device['controls']['wait_time'] = {
+        'title': {'en': 'Wait time', 'ru': 'Wait time'},
+        'min': 0,
+        'max': script['wait_time'],
+        'readonly': True,
+        'type': 'range',
+        'order': 20,
+        'default': script['wait_time']
+    }
+
+    order = 30
+
+    for idx, sensor in enumerate(script['sensors']):
+        if (sensor['sensor'] == 'disabled'): continue
+
+        title = "Motion sensor"
+        if (sensor['name'] != ""):
+            title = sensor['name']
+        else:
+            if (len(script['sensors']) > 1):
+                title = "Motion sensor " + str(idx + 1)
+
+        control_id = 'sensor' + str(idx+1) + '_status'
+        device['controls'][control_id] = {
+            'title': {'en': title, 'ru': title},
+            'type': 'switch',
+            'readonly': True,
+            'order': order,
+            'default': 0
+        }
+
+        order = order + 1
+
+    for idx, relay in enumerate(script['relays']):
+        if (relay['relay'] == 'disabled'): continue
+
+        title = "Relay"
+        if (relay['name'] != ""):
+            title = relay['name']
+        else:
+            if (len(script['relays']) > 1):
+                title = "Relay " + str(idx + 1)
+
+        control_id = 'relay' + str(idx+1) + '_status'
+        device['controls'][control_id] = {
+            'title': {'en': title, 'ru': title},
+            'type': 'switch',
+            'readonly': True,
+            'order': order,
+            'default': 0
+        }
+
+        order = order + 1
+
+    wbAddDevice(device_id, device)
+
+def wbAddDevice(device_id, device):
+    topic = '/devices/' + device_id + '/meta'
+    mqtt_publish(topic, json.dumps(device['meta']))
+
+    device_live = devices[device_id] if device_id in devices else False
+
+    for name in sorted(device['meta'].keys()):
+        if (name == 'title'): continue
+        value = device['meta'][name]
+        topic = '/devices/' + device_id + '/meta/' + name
+        mqtt_publish(topic, value)
+
+    for key in sorted(device['controls'].keys()):
+        control = device['controls'][key]
+        topic = '/devices/' + device_id + '/controls/' + key + '/meta'
+        data = control
+
+        if ('default' in data):
+            if (not device_live):
+                mqtt_publish('/devices/' + device_id + '/controls/' + key, data['default'])
+            del data['default']
+
+        mqtt_publish(topic, json.dumps(data))
+
+        for name in sorted(control.keys()):
+            if (name == 'title' or name == 'default'): continue
+            value = control[name]
+            topic = '/devices/' + device_id + '/controls/' + key + '/meta/' + name
+            if (name == 'readonly'):
+                value = 1 if value else 0
+                mqtt_publish(topic, value)
+                continue
+
+            mqtt_publish(topic, value)
+
+def initScripts():
+    for script in config['scripts']:
+        if script['script_type'] == 'thermostat':
+            initScriptThermostat(script)
+        if script['script_type'] == 'motion':
+            initScriptMotion(script)
+    pass
+
+def start():
+    if ('devices_config' in config): initHass()
+    if ('scripts' in config): initScripts()
+    pass
+
+def main():
+    args = {
+        '--conf': toConf,
+        '--json': toJson,
+        '--start': start
+    }
+
+    if (len(sys.argv) > 1 and sys.argv[1] in args):
+        return args[sys.argv[1]]()
+
+    return toJson()
+
+if __name__ == "__main__":
+    main()
