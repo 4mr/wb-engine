@@ -114,6 +114,8 @@ def parseWB(topicParts, msg):
             devices[deviceName][topicParts[4]] = msg.payload.decode("utf-8")
 
     elif (topicParts[3] == 'controls' and topicParts[5] == 'meta'):
+        if (deviceName not in devices):
+            devices[deviceName] = {"id": deviceName}
         controlName = topicParts[4]
         if ('controls' not in devices[deviceName]):
             devices[deviceName]['controls'] = {}
