@@ -191,6 +191,17 @@ function scriptThermostatInit(script) {
 		publish(msg.topic.replace('/on', ''), msg.value, 0, true);
 	});
 
+	trackMqtt('/devices/' + id + '/controls/mode/set', function(msg){
+		if (msg.value == 'off') {
+			scripts[id].state = 'off';
+			publish(topic + 'enable', 0, 0, true);
+		} else {
+			scripts[id].state = 'idle';
+			publish(topic + 'enable', 1, 0, true);
+		}
+		termosatLogic(id)
+	});
+
 	script.zones.forEach(function (zone, idx){
 		if (zone.sensor == 'disabled' || zone.relay == 'disabled') {
 			return;

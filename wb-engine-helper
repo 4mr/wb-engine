@@ -629,6 +629,7 @@ def initScriptThermostat(script):
             'power_command_topic': '/devices/' + device_id + '/controls/enable/on',
             'mode_state_topic': '/devices/' + device_id + '/controls/enable',
             'mode_state_template': "{{ '" + script['mode'] + "' if value == '1' else 'off' }}",
+            'mode_command_topic': '/devices/' + device_id + '/controls/mode/set',
             'payload_on': 1,
             'payload_off': 0
         }
