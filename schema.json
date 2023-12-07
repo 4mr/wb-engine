@@ -30,8 +30,6 @@
                 "$ref": "#/definitions/devices"
             },
             "options": {
-                // "collapsed": true,
-
                 "disable_collapse": false,
                 "disable_array_delete": true,
                 "disable_array_add": true,
@@ -246,6 +244,13 @@
                     "type": "string",
                     "default": "100",
                     "propertyOrder": 6
+                },
+                "motion_raw": {
+                    "type": "boolean",
+                    "title": "Raw Motion Value",
+                    "default": false,
+                    "_format": "checkbox",
+                    "propertyOrder": 7
                 }
             },
             "options": {
@@ -264,7 +269,8 @@
             "headerTemplate" : "script_header_template",
             "oneOf": [
                 {"$ref": "#/definitions/thermostatScript"},
-                {"$ref": "#/definitions/motionScript"}
+                {"$ref": "#/definitions/motionScript"},
+                {"$ref": "#/definitions/coverScript"}
             ],
             "defaultProperties": ["script_type"],
             "options": {
@@ -634,6 +640,101 @@
                     "options": {"grid_columns": 2}
                 }
             }
+        },
+
+        "coverScript": {
+            "_format": "grid",
+            "allOf": [
+                {"$ref": "#/definitions/coverSettings"},
+                {"$ref": "#/definitions/commonScriptSettings"}
+            ],
+            "properties":  {
+                "script_type": {
+                    "title": "Script Type",
+                    "default": "cover",
+                    "enum": ["cover"],
+                    "options": {"hidden": true},
+                    "propertyOrder": 1,
+                    "type": "string"
+                }
+            },
+            "required": ["script_type"],
+            "options": {
+                "keep_oneof_values": false,
+                "wb": {"disable_panel": true}
+            },
+            "title": "Cover",
+            "type": "object"
+        },
+        "coverSettings": {
+            "_format": "grid",
+            "title": "Cover",
+            "type": "object",
+            "properties":  {
+                "hass_enabled": {
+                    "_format": "checkbox",
+                    "default": false,
+                    "options": {
+                        "grid_columns": 12
+                    },
+                    "propertyOrder": 20,
+                    "title": "Add Script to HomeAssistant",
+                    "type": "boolean"
+                },
+                "run_time": {
+                    "title": "Run time",
+                    "description": "Motor running time (seconds)",
+                    "type": "integer",
+                    "default": 20,
+                    "propertyOrder": 60,
+                    "options": {"grid_columns": 6},
+                    "minimum": 5,
+                    "maximum": 86400
+                },
+                "cover_class": {
+                    "type": "string",
+                    "title": "Cover class",
+                    "default": "curtain",
+                    "watch": {
+                        "cover_class": "root.dict.cover_class"
+                    },
+                    "enumSource": [
+                        {"source": "cover_class", "title": "{{item}}", "value": "{{item}}"}
+                    ],
+                    "propertyOrder": 65,
+                    "options": {"grid_columns": 6}
+                },
+                "relay": {
+                    "type": "string",
+                    "title": "Relay ON/OFF",
+                    "watch": {
+                        "switch": "root.dict.switch"
+                    },
+                    "enumSource": [
+                        {"source": "switch", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "propertyOrder": 70,
+                    "options": {"grid_columns": 6}
+                },
+                "relay_direction": {
+                    "type": "string",
+                    "title": "Direction Relay (NO/NC)",
+                    "description": "NO - motor open, NC - motor close",
+                    "watch": {
+                        "switch": "root.dict.switch"
+                    },
+                    "enumSource": [
+                        {"source": "switch", "title": "{{item.title}}", "value": "{{item.value}}"}
+                    ],
+                    "propertyOrder": 80,
+                    "options": {"grid_columns": 6}
+                }
+            },
+            "options": {
+                "keep_oneof_values": false,
+                "wb": {"disable_panel": true}
+            },
+            "defaultProperties": ["script_type", "enabled", "hass_enabled", "name", "title", "run_time", "cover_class", "relay", "relay_direction"]
         }
     },
 

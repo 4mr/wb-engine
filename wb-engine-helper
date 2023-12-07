@@ -721,6 +721,27 @@ def initScriptMotion(script):
 
     wbAddDevice(device_id, device)
 
+def initScriptCover(script):
+    if (script['hass_enabled']):
+        device_id = 'script_' + fix(script['name'].lower())
+        device_title = script['title'] if 'title' in script else script['name']
+        hass = {
+                'device': {
+                    "identifiers": device_id,
+                    "manufacturer": "WirenBoard",
+                    "model": "cover [wb-engine]",
+                    "name": device_title
+                },
+                'name': device_title,
+                'unique_id': device_id,
+                'object_id': device_id,
+                'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
+                'command_topic': '/devices/' + device_id + '/command'
+            }
+
+        hass_topic = ['cover', fix(device_id), 'cover', 'config']
+        hassPublish(True, hass, hass_topic)
+
 def wbAddDevice(device_id, device):
     topic = '/devices/' + device_id + '/meta'
     mqtt_publish(topic, json.dumps(device['meta']))
@@ -762,6 +783,8 @@ def initScripts():
             initScriptThermostat(script)
         if script['script_type'] == 'motion':
             initScriptMotion(script)
+        if script['script_type'] == 'cover':
+            initScriptCover(script)
     pass
 
 def start():

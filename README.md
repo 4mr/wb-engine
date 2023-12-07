@@ -17,11 +17,21 @@
   <img src="docs/images/ha1.png" width="45%">
 </p>
 
+## Пример создания виртуальных штор (cover)
+
+<p align="center">
+  <img src="docs/images/script_cover1.png">
+</p>
+<p align="center">
+  <img src="docs/images/script_cover2.png" width="45%">
+  <img src="docs/images/script_cover3.png" width="45%">
+</p>
+
 ## Установка
 
 Скачайте файл пакета на устройство WirenBoard и установите с помощью dpkg.
 
 ```
-wget https://github.com/4mr/wb-engine/releases/download/v0.2.22/wb-engine_0.2.22_armhf.deb
-dpkg -i wb-engine_0.2.22_armhf.deb
+wget https://github.com/4mr/wb-engine/releases/download/v0.2.23/wb-engine_0.2.21_armhf.deb
+dpkg -i wb-engine_0.2.23_armhf.deb
 ```

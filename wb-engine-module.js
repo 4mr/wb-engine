@@ -63,6 +63,9 @@ function scriptsInit() {
 			case 'motion':
 				scriptMotionInit(script);
 				break;
+			case 'cover':
+				scriptCoverInit(script);
+				break;
 		}
 	});
 }
@@ -393,4 +396,126 @@ function scriptMotionInit(script) {
 	});
 
 	motionLogic(id);
+}
+
+function scriptCoverInit(script) {
+	var id = "script_" + script['name'].fix();
+
+	log('scriptCoverInit[{}]', id);
+
+	if (typeof scripts[id] == 'undefined') {
+		scripts[id] = {
+			state: 'off',
+			sensors: [],
+			run_time: script.run_time,
+			config: script,
+			timer: false,
+			timer2: false
+		}
+
+		defineVirtualDevice(id, {
+			title: script.title,
+			cells: {
+				state: {
+					title: "State",
+					type: "text",
+					value: "stopped",
+					order: 1
+				},
+				open: {
+					title: "Open",
+					type: "pushbutton",
+					order: 2
+				},
+				stop: {
+					title: "Stop",
+					type: "pushbutton",
+					order: 3
+				},
+				close: {
+					title: "Close",
+					type: "pushbutton",
+					order: 4
+				}
+			}
+		});
+	}
+
+	trackMqtt('/devices/' + id + '/command', function(msg){
+		coverLogic(id, msg.value.toLowerCase());
+	});
+
+	defineRule(id + '.open', {
+		whenChanged: id + '/open',
+		then: function (value, devName, cellName) {
+			coverLogic(id, 'open');
+		}
+	});
+
+	defineRule(id + '.stop', {
+		whenChanged: id + '/stop',
+		then: function (value, devName, cellName) {
+			coverLogic(id, 'stop');
+		}
+	});
+
+	defineRule(id + '.close', {
+		whenChanged: id + '/close',
+		then: function (value, devName, cellName) {
+			coverLogic(id, 'close');
+		}
+	});
+
+}
+
+function coverLogic(id, cmd) {
+	var run_time = scripts[id].run_time;
+	var relay = scripts[id].config.relay;
+	var relay_direction = scripts[id].config.relay_direction;
+	var topic = '/devices/' + id + '/state';
+
+	if (relay == "" || relay_direction == "") {
+		log('{} relay not defined', id);
+		return;
+	}
+
+	log('{} cmd {}', id, cmd);
+
+	if (scripts[id].timer) {
+		clearTimeout(scripts[id].timer);
+		scripts[id].timer == false;
+	}
+	if (scripts[id].timer2) {
+		clearTimeout(scripts[id].timer2);
+		scripts[id].timer2 = false;
+	}
+
+	if (cmd == 'stop') {
+		dev[relay] = false;
+		dev[id]['state'] = 'stopped';
+		return;
+	}
+
+	var isOpen = (cmd == 'open');
+	var delay = 50;
+
+	if (dev[relay] == true) delay = 500;
+
+	log('{} relay off, delay = {}', id, delay);
+	dev[relay] = false;
+
+	scripts[id].timer = setTimeout(function(){
+		scripts[id].timer = false;
+		log('{} do {}', id, cmd);
+		dev[relay_direction] = isOpen;
+		dev[relay] = true;
+		dev[id]['state'] = (isOpen) ? 'opening' : 'closing';
+
+		scripts[id].timer2 = setTimeout(function(){
+			scripts[id].timer2 = false;
+			log('{} relay off', id);
+			dev[relay] = false;
+			dev[id]['state'] = 'stopped';
+		}, run_time * 1000);
+	}, delay);
 }
