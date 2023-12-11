@@ -103,14 +103,14 @@ def parseWB(topicParts, msg):
         if (len(msg.payload) > 0):
             meta = json.loads(msg.payload.decode("utf-8"))
             for key in meta:
-                if (key in valid['device_meta']):
+                if ('device_meta' in valid and key in valid['device_meta']):
                     devices[deviceName][key] = meta[key]
 
     # /devices/+/meta/+
     elif (topicParts[3] == 'meta' and topicPartsSize > 4):
         if (deviceName not in devices):
             devices[deviceName] = {"id": deviceName}
-        if (topicParts[4] in valid['device_meta']):
+        if ('device_meta' in valid and topicParts[4] in valid['device_meta']):
             devices[deviceName][topicParts[4]] = msg.payload.decode("utf-8")
 
     elif (topicParts[3] == 'controls' and topicParts[5] == 'meta'):
@@ -134,11 +134,11 @@ def parseWB(topicParts, msg):
                     elif ('ru' in meta[key]):
                         devices[deviceName]['controls'][controlName]['name'] = meta[key]['ru']
                     continue
-                if (key in valid['control_meta']):
+                if ('device_meta' in valid and key in valid['control_meta']):
                     devices[deviceName]['controls'][controlName][key] = meta[key]
         else:
             # /devices/+/controls/+/meta/+
-            if (topicParts[6] in valid['control_meta']):
+            if ('control_meta' in valid and topicParts[6] in valid['control_meta']):
                 devices[deviceName]['controls'][controlName][topicParts[6]] = msg.payload.decode("utf-8")
 
 def loadDevices():
@@ -338,27 +338,37 @@ def hassAdd(device):
                 if ("settings" in list[key] and name in list[key]["settings"]): continue
                 opts[name] = list[key][name]
 
-                if isinstance(opts[name], str):
-                    for test in replace:
-                        opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
+                for test in replace:
+                    if (opts[name] == "{{" + test + "}}"):
+                        opts[name] = replace[test]
+                    else:
+                        if isinstance(opts[name], str):
+                            opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
 
     def config_apply(list, opts, replace):
         for name in list:
             if (name in ['default']): continue
             opts[name] = list[name]
 
-            if (isinstance(opts[name], str)):
-                for test in replace:
-                    opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
-                if ('default' in list):
-                    for test in list['default']:
+            for test in replace:
+                if (opts[name] == "{{" + test + "}}"):
+                    opts[name] = replace[test]
+                else:
+                    if (isinstance(opts[name], str)):
+                        opts[name] = opts[name].replace("{{" + test + "}}", str(replace[test]))
+
+            if ('default' in list):
+                for test in list['default']:
+                    if (isinstance(opts[name], str)):
                         opts[name] = opts[name].replace("{{" + test + "}}", list['default'][test])
 
     device_model = device['id'].split('_')[0]
 
     # todo: check live exists
     device_live = devices[device['id']]
-    device_driver = device_live['driver']
+    device_driver = "none"
+    if ('driver' in device_live):
+        device_driver = device_live['driver']
 
     device_custom_name = device['custom_name'] if ('custom_name' in device) else device['name']
     device_hass_model = device_model + " [" + device_driver + "]" if (device_model != device_driver) else device_model

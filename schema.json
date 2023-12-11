@@ -204,6 +204,28 @@
                         "patternmessage": "Only numbers"
                     }
                 },
+                "mireds_max": {
+                    "type": "number",
+                    "title": "Mireds Max",
+                    "propertyOrder": 5,
+                    "default": 454,
+                    "pattern" : "^(|-)([0-9\\.]+)$",
+                    "options": {
+                        "grid_columns": 4,
+                        "patternmessage": "Only numbers"
+                    }
+                },
+                "mireds_min": {
+                    "type": "number",
+                    "title": "Mireds Min",
+                    "propertyOrder": 6,
+                    "default": 154,
+                    "pattern" : "^(|-)([0-9\\.]+)$",
+                    "options": {
+                        "grid_columns": 4,
+                        "patternmessage": "Only numbers"
+                    }
+                },
                 "pulse_count": {
                     "type": "integer",
                     "title": "Pulse Count",
