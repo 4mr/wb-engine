@@ -165,6 +165,12 @@ def getByID(list, id):
             return item
     return False
 
+def getByName(list, name):
+    for item in list:
+        if ('name' in item and item['name'] == name):
+            return item
+    return False
+
 def fix(text):
     repls = ('(', ''), (')', '')
     return re.sub('[^a-zA-Z0-9-]+', '_', reduce(lambda a, kv: a.replace(*kv), repls, text.lower()))
@@ -192,13 +198,19 @@ def toJson():
     if ('devices_config' not in config): config['devices_config'] = []
 
     default_config = config_devices['devices']['default']
+    config_temp['areas'] = config['areas'] if ('areas' in config) else []
     config_temp['scripts'] = config['scripts'] if ('scripts' in config) else []
     config_temp['dict'] = {}
     config_temp['dict']['cover_class'] = ['awning', 'blind', 'curtain', 'damper', 'door', 'garage', 'gate', 'shade', 'shutter', 'window']
     config_temp['dict']['thermostat_modes'] = ['heat', 'cool']
 
     for key, script in enumerate(config_temp['scripts']):
+        if (config_temp['scripts'][key]['script_type'] == 'cover'):
+            if ('device_name' not in config_temp['scripts'][key]):
+                config_temp['scripts'][key]['device_name'] = 'default'
         if (config_temp['scripts'][key]['script_type'] == 'thermostat'):
+            if ('device_name' not in config_temp['scripts'][key]):
+                config_temp['scripts'][key]['device_name'] = 'default'
             if ('mode' not in config_temp['scripts'][key]):
                 config_temp['scripts'][key]['mode'] = 'heat'
             if ('temperature_target' not in config_temp['scripts'][key]):
@@ -243,7 +255,7 @@ def toJson():
             file_control = False
             if (file_device): file_control = getByID(file_device['controls'], control['id'])
 
-            newControl = {'id': control['id'], 'name': control['name'], 'enabled': False}
+            newControl = {'id': control['id'], 'name': control['name'], 'enabled': False, 'device_name': 'default'}
 
             if (device_config):
                 if ('ignore' in default_config):
@@ -274,6 +286,8 @@ def toJson():
 
             title = ' / '.join([
                 newDevice['custom_name'] if ('custom_name' in newDevice) else newDevice['name'],
+                newControl['id'],
+                ("[" + newControl['device_name'] + "] " if ('device_name' in newControl and newControl['device_name'] != 'default') else "") +
                 newControl['custom_name'] if ('custom_name' in newControl) else newControl['name']
             ])
 
@@ -303,9 +317,12 @@ def toConf():
         'devices_config': []
     }
 
+    temp_config['areas'] = []
     temp_config['scripts'] = []
     for script in config_web['scripts']:
         temp_config['scripts'].append(script)
+    for area in config_web['areas']:
+        temp_config['areas'].append(area)
 
     for device in config_web['devices_config']:
         newDevice = {}
@@ -395,6 +412,7 @@ def hassAdd(device):
             if (not key.endswith('_create_control')): continue
             if (key not in device): continue
             if (device[key] == True and key in device_config['controls']):
+                # dooya_create_control
                 control = device_config['controls'][key]
                 control['enabled'] = True
                 control['name'] = device_custom_name
@@ -435,9 +453,27 @@ def hassAdd(device):
             if (isinstance(control_live[key], bool)): continue
             replace[key] = control_live[key]
 
+        temp_device = device_opts.copy()
+
+        if ('device_name' in device and device['device_name'] != 'default' and 'areas' in config):
+            area = getByName(config['areas'], device['device_name'])
+            if (area):
+                temp_device['model'] = 'wb-engine custom device'
+                temp_device['identifiers'] = area['name']
+                temp_device['name'] = area['title']
+                temp_device['suggested_area'] = area['title']
+
+        if ('device_name' in control and control['device_name'] != 'default' and 'areas' in config):
+            area = getByName(config['areas'], control['device_name'])
+            if (area):
+                temp_device['model'] = 'wb-engine custom device'
+                temp_device['identifiers'] = area['name']
+                temp_device['name'] = area['title']
+                temp_device['suggested_area'] = area['title']
+
         control_opts = {
             'type': control['type'] if ('type' in control) else control_live['type'],
-            'device': device_opts,
+            'device': temp_device,
             'availability_mode': 'latest',
             'enabled_by_default': True,
             'availability': [
@@ -520,6 +556,12 @@ def hassPublish(control_enabled, control_opts, hass_topic):
             hass_state = devices_ha[hass_topic[0]][hass_topic[1]][hass_topic[2]]
             if ('unique_id' in hass_state and hass_state['unique_id'] != control_opts['unique_id']):
                 mqtt_publish(topic, None)
+                time.sleep(0.5)
+
+            # delete if device name changed
+            if ('device' in hass_state and 'name' in hass_state['device'] and hass_state['device']['name'] != control_opts['device']['name']):
+                mqtt_publish(topic, None)
+                time.sleep(0.5)
 
         mqtt_publish(topic, json.dumps(control_opts))
 
@@ -617,7 +659,7 @@ def initScriptThermostat(script):
         order2 = order2 + 1
 
     if (script['hass_enabled']):
-        hass_hvac = {
+        hass = {
             'device': {
                 "identifiers": device_id,
                 "manufacturer": "WirenBoard",
@@ -644,8 +686,16 @@ def initScriptThermostat(script):
             'payload_off': 0
         }
 
+        if ('device_name' in script):
+            area = getByName(config['areas'], script['device_name'])
+            if (area):
+                hass['device']['model'] = 'wb-engine custom device'
+                hass['device']['identifiers'] = area['name']
+                hass['device']['name'] = area['title']
+                hass['device']['suggested_area'] = area['title']
+
         hass_topic = ['climate', fix(device_id), 'hvac', 'config']
-        hassPublish(True, hass_hvac, hass_topic)
+        hassPublish(True, hass, hass_topic)
 
     wbAddDevice(device_id, device)
 
@@ -736,18 +786,26 @@ def initScriptCover(script):
         device_id = 'script_' + fix(script['name'].lower())
         device_title = script['title'] if 'title' in script else script['name']
         hass = {
-                'device': {
-                    "identifiers": device_id,
-                    "manufacturer": "WirenBoard",
-                    "model": "cover [wb-engine]",
-                    "name": device_title
-                },
-                'name': device_title,
-                'unique_id': device_id,
-                'object_id': device_id,
-                'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
-                'command_topic': '/devices/' + device_id + '/command'
-            }
+            'device': {
+                "identifiers": device_id,
+                "manufacturer": "WirenBoard",
+                "model": "cover [wb-engine]",
+                "name": device_title
+            },
+            'name': device_title,
+            'unique_id': device_id,
+            'object_id': device_id,
+            'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
+            'command_topic': '/devices/' + device_id + '/command'
+        }
+
+        if ('device_name' in script):
+            area = getByName(config['areas'], script['device_name'])
+            if (area):
+                hass['device']['model'] = 'wb-engine custom device'
+                hass['device']['identifiers'] = area['name']
+                hass['device']['name'] = area['title']
+                hass['device']['suggested_area'] = area['title']
 
         hass_topic = ['cover', fix(device_id), 'cover', 'config']
         hassPublish(True, hass, hass_topic)

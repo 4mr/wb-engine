@@ -33,18 +33,39 @@
                 "disable_collapse": false,
                 "disable_array_delete": true,
                 "disable_array_add": true,
-                "disable_array_reorder": true
+                "disable_array_reorder": true,
+                "disable_array_delete_last_row": true,
+                "disable_array_delete_all_rows": true
+            }
+        },
+        "areas": {
+            "type": "array",
+            "title": "Areas",
+            "_format": "tabs",
+            "propertyOrder": 2,
+            "items": {
+                "$ref": "#/definitions/area"
+            },
+            "options": {
+                "collapsed": true,
+                "disable_collapse": false,
+                "disable_array_delete": false,
+                "disable_array_add": false,
+                "disable_array_reorder": false,
+                "disable_array_delete_last_row": true,
+                "disable_array_delete_all_rows": true
             }
         },
         "scripts": {
             "type": "array",
-            "title": "List of Scripts",
+            "title": "Scripts",
             "_format": "tabs",
             "propertyOrder": 2,
             "items": {
                 "$ref": "#/definitions/script"
             },
             "options": {
+                "collapsed": true,
                 "enable_array_copy": true,
                 "disable_collapse": false,
                 "disable_array_delete": false,
@@ -120,16 +141,35 @@
                         "grid_columns": 4
                     }
                 },
-                "dooya_cover_class": {
+                "device_name": {
                     "type": "string",
-                    "title": "Cover class",
-                    "default": "curtain",
+                    "title": "HA device name",
+                    "default": "default",
                     "propertyOrder": 12,
                     "options": {
                         "dependencies": {
                             "dooya_create_control": true
                         },
-                        "grid_columns": 8
+                        "grid_columns": 4
+                    },
+                    "watch": {
+                        "areas": "root.areas"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Default", "value": "default"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "areas", "title": "{{item.title}}", "value": "{{item.name}}"}
+                    ]
+                },
+                "dooya_cover_class": {
+                    "type": "string",
+                    "title": "Cover class",
+                    "default": "curtain",
+                    "propertyOrder": 13,
+                    "options": {
+                        "dependencies": {
+                            "dooya_create_control": true
+                        },
+                        "grid_columns": 4
                     },
                     "watch": {
                         "cover_class": "root.dict.cover_class"
@@ -175,10 +215,29 @@
                         "grid_columns": 12
                     }
                 },
+                "device_name": {
+                    "type": "string",
+                    "title": "Device name",
+                    "default": "default",
+                    "propertyOrder": 2,
+                    "options": {
+                        "dependencies": {
+                            "enabled": true
+                        },
+                        "grid_columns": 12
+                    },
+                    "watch": {
+                        "areas": "root.areas"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Default", "value": "default"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "areas", "title": "{{item.title}}", "value": "{{item.name}}"}
+                    ]
+                },
                 "hass_id": {
                     "type": "string",
                     "title": "HomeAssistant ID",
-                    "propertyOrder": 2,
+                    "propertyOrder": 3,
                     "options": {
                         "show_opt_in": true,
                         "grid_columns": 12
@@ -187,7 +246,7 @@
                 "custom_name": {
                     "type": "string",
                     "title": "Custom Name",
-                    "propertyOrder": 3,
+                    "propertyOrder": 4,
                     "options": {
                         "show_opt_in": true,
                         "grid_columns": 12
@@ -196,7 +255,7 @@
                 "add_value": {
                     "type": "number",
                     "title": "Add Value",
-                    "propertyOrder": 4,
+                    "propertyOrder": 5,
                     "default": 0,
                     "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
@@ -207,7 +266,7 @@
                 "mireds_max": {
                     "type": "number",
                     "title": "Mireds Max",
-                    "propertyOrder": 5,
+                    "propertyOrder": 10,
                     "default": 454,
                     "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
@@ -218,7 +277,7 @@
                 "mireds_min": {
                     "type": "number",
                     "title": "Mireds Min",
-                    "propertyOrder": 6,
+                    "propertyOrder": 11,
                     "default": 154,
                     "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
@@ -230,7 +289,7 @@
                     "type": "integer",
                     "title": "Pulse Count",
                     "description": "How many litres per impulse",
-                    "propertyOrder": 4,
+                    "propertyOrder": 10,
                     "default": 1,
                     "minimum": 1,
                     "options": {
@@ -240,7 +299,7 @@
                 "type": {
                     "type": "string",
                     "title": "Control type",
-                    "propertyOrder": 4,
+                    "propertyOrder": 10,
                     "watch": {
                         "list": "control_item.types"
                     },
@@ -284,6 +343,52 @@
                 }
             }
         },
+
+        "area": {
+            "title": "Area",
+            "headerTemplate": "{{self.name}}",
+            "allOf": [
+                {"$ref": "#/definitions/areaSettings"}
+            ],
+            "options": {
+                "disable_collapse": true,
+                "disable_properties": true,
+                "disable_edit_json": true,
+                "wb": {
+                    "disable_title": true
+                }
+            }
+        },
+
+        "areaSettings": {
+            "type": "object",
+            "_format": "grid",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "title": "Name",
+                    "default": "area",
+                    "uniqueItems": true,
+                    "propertyOrder": 10,
+                    "pattern" : "^([a-z0-9_\\.\\s]+)$",
+                    "options": {
+                        "grid_columns": 6,
+                        "patternmessage": "Only english characters (a-z) and numbers (0-9) are allowed"
+                    }
+                },
+                "title": {
+                    "type": "string",
+                    "title": "Title",
+                    "default": "Название",
+                    "propertyOrder": 20,
+                    "options": {
+                        "grid_columns": 6
+                    }
+                }
+            }
+        },
+
+
 
         "script": {
             "_format": "wb-multiple",
@@ -378,10 +483,29 @@
                     "title": "Add Script to HomeAssistant",
                     "type": "boolean"
                 },
+                "device_name": {
+                    "type": "string",
+                    "title": "Device name",
+                    "default": "default",
+                    "propertyOrder": 21,
+                    "options": {
+                        "dependencies": {
+                            "hass_enabled": true
+                        },
+                        "grid_columns": 12
+                    },
+                    "watch": {
+                        "areas": "root.areas"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Default", "value": "default"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "areas", "title": "{{item.title}}", "value": "{{item.name}}"}
+                    ]
+                },
                 "mode": {
                     "type": "string",
                     "title": "Work mode",
-                    "propertyOrder": 21,
+                    "propertyOrder": 22,
                     "default": "heat",
                     "options": {
                         "grid_columns": 6
@@ -399,7 +523,7 @@
                     "options": {
                         "grid_columns": 6
                     },
-                    "propertyOrder": 22,
+                    "propertyOrder": 23,
                     "title": "Relay inverted control",
                     "type": "boolean"
                 },
@@ -462,7 +586,7 @@
             "options": {
                 "wb": {"disable_panel": true}
             },
-            "defaultProperties": ["script_type", "enabled", "hass_enabled", "mode", "inverted_control", "name", "title", "temperature_target", "temperature_min", "temperature_max", "hysteresis", "zones"]
+            "defaultProperties": ["script_type", "enabled", "hass_enabled", "device_name", "mode", "inverted_control", "name", "title", "temperature_target", "temperature_min", "temperature_max", "hysteresis", "zones"]
         },
         "thermostatZoneSettings": {
             "title": "Zone",
@@ -703,6 +827,25 @@
                     "title": "Add Script to HomeAssistant",
                     "type": "boolean"
                 },
+                "device_name": {
+                    "type": "string",
+                    "title": "Device name",
+                    "default": "default",
+                    "propertyOrder": 30,
+                    "options": {
+                        "dependencies": {
+                            "hass_enabled": true
+                        },
+                        "grid_columns": 12
+                    },
+                    "watch": {
+                        "areas": "root.areas"
+                    },
+                    "enumSource": [
+                        {"source": [{"title": "Default", "value": "default"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                        {"source": "areas", "title": "{{item.title}}", "value": "{{item.name}}"}
+                    ]
+                },
                 "run_time": {
                     "title": "Run time",
                     "description": "Motor running time (seconds)",
@@ -756,7 +899,7 @@
                 "keep_oneof_values": false,
                 "wb": {"disable_panel": true}
             },
-            "defaultProperties": ["script_type", "enabled", "hass_enabled", "name", "title", "run_time", "cover_class", "relay", "relay_direction"]
+            "defaultProperties": ["script_type", "enabled", "hass_enabled", "device_name", "name", "title", "run_time", "cover_class", "relay", "relay_direction"]
         }
     },
 

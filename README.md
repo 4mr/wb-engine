@@ -32,6 +32,6 @@
 Скачайте файл пакета на устройство WirenBoard и установите с помощью dpkg.
 
 ```
-wget https://github.com/4mr/wb-engine/releases/download/v0.2.25/wb-engine_0.2.25_armhf.deb
-dpkg -i wb-engine_0.2.25_armhf.deb
+wget https://github.com/4mr/wb-engine/releases/download/v0.3.0/wb-engine_0.3.0_armhf.deb
+dpkg -i wb-engine_0.3.0_armhf.deb
 ```
