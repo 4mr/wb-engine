@@ -425,8 +425,9 @@ def hassAdd(device):
         if (test_ignore(control, default_config)): continue
         if (test_ignore(control, device_config)): continue
 
-        control_live = device_live['controls'][control['id']]
         control_enabled = control['enabled']
+        control_live = device_live['controls'][control['id']]
+        if ('type' not in control_live): continue
 
         replace = {
             'control_id': control['id'],
