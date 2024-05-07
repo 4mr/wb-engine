@@ -22,7 +22,14 @@ function engineInit() {
 
 	runShellCommand("/usr/bin/wb-engine-helper --start", {
 		captureOutput: true,
-		exitCallback: function(exitCode, capturedOutput) {
+		captureErrorOutput: true,
+		exitCallback: function(exitCode, out, err) {
+			if (out != "") {
+				log(out);
+			}
+			if (err != "") {
+				log(err);
+			}
 			devicesInit();
 			scriptsInit();
 			log("wb-engine init finished");
