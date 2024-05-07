@@ -1,6 +1,6 @@
 exports.init = engineInit;
 
-var config = readConfig("/etc/wb-rules/wb-engine.conf");
+var config = {};
 var motion_timer_interval = 1
 var scripts = {};
 
@@ -14,9 +14,22 @@ String.prototype.fix = function() {
 
 function engineInit() {
 	log("wb-engine init");
+	try {
+		config = readConfig("/etc/wb-rules/wb-engine.conf");
+	} catch (e) {
+		// NOTE: readConfig already logging it's error
+	}
+
 	runShellCommand("/usr/bin/wb-engine-helper --start", {
 		captureOutput: true,
-		exitCallback: function(exitCode, capturedOutput) {
+		captureErrorOutput: true,
+		exitCallback: function(exitCode, out, err) {
+			if (out != "") {
+				log(out);
+			}
+			if (err != "") {
+				log(err);
+			}
 			devicesInit();
 			scriptsInit();
 			log("wb-engine init finished");
