@@ -1,0 +1,91 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+env:
+  APP_NAME: 'wb-engine'
+  MAINTAINER: '4mr https://github.com/4mr/wb-engine'
+  DESC: 'WB Engine and HomeAssistant integration'
+  DEPENDS: 'wb-mqtt-confed (>= 1.8.1), wb-rules (>= 2.11.4)'
+
+jobs:
+  build-linux-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: build script
+        run: |
+          mkdir -p .debpkg/etc/wb-rules
+          mkdir -p .debpkg/etc/wb-rules-modules
+          mkdir -p .debpkg/usr/bin
+          mkdir -p .debpkg/usr/share/wb-mqtt-confed/schemas
+
+          cp devices.conf        .debpkg/etc/wb-rules/wb-engine.devices.conf
+          cp wb-engine-rule.js   .debpkg/etc/wb-rules/wb-engine.js
+          cp wb-engine-module.js .debpkg/etc/wb-rules-modules/wb-engine.js
+          cp wb-engine-helper    .debpkg/usr/bin/wb-engine-helper
+          cp schema.json         .debpkg/usr/share/wb-mqtt-confed/schemas/wb-engine.schema.json
+
+          mkdir -p .debpkg/DEBIAN
+          echo -e "touch /etc/wb-rules/wb-engine.conf" > .debpkg/DEBIAN/postinst
+          chmod +x .debpkg/DEBIAN/postinst
+      - uses: jiro4989/build-deb-action@v3
+        with:
+          package: ${{ env.APP_NAME }}
+          package_root: .debpkg
+          maintainer: ${{ env.MAINTAINER }}
+          depends: ${{ env.DEPENDS }}
+          version: ${{ github.ref }}
+          arch: armhf
+          desc: ${{ env.DESC }}
+      - uses: jiro4989/build-deb-action@v3
+        with:
+          package: ${{ env.APP_NAME }}
+          package_root: .debpkg
+          maintainer: ${{ env.MAINTAINER }}
+          depends: ${{ env.DEPENDS }}
+          version: ${{ github.ref }}
+          arch: arm64
+          desc: ${{ env.DESC }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifact-deb
+          path: |
+            ./*.deb
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-linux-packages
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          body: ''
+          draft: false
+          prerelease: false
+
+  upload-linux-packages:
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: artifact-deb
+      - name: upload release assets
+        id: upload-release-assets
+        uses: alexellis/upload-assets@0.4.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          asset_paths: '["./*.deb"]'
