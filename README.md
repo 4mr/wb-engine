@@ -31,7 +31,14 @@
 
 Скачайте файл пакета на устройство WirenBoard и установите с помощью dpkg.
 
+### Wirenboard 8
 ```
-wget https://github.com/4mr/wb-engine/releases/download/v0.3.1/wb-engine_0.3.1_armhf.deb
-dpkg -i wb-engine_0.3.1_armhf.deb
+wget https://github.com/4mr/wb-engine/releases/download/v0.3.2/wb-engine_0.3.2_arm64.deb
+dpkg -i wb-engine_0.3.2_arm64.deb
+```
+
+### Wirenboard 6,7
+```
+wget https://github.com/4mr/wb-engine/releases/download/v0.3.2/wb-engine_0.3.2_armhf.deb
+dpkg -i wb-engine_0.3.2_armhf.deb
 ```
