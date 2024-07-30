@@ -33,12 +33,14 @@
 
 ### Wirenboard 8
 ```
-wget https://github.com/4mr/wb-engine/releases/download/v0.3.3/wb-engine_0.3.3_arm64.deb
-dpkg -i wb-engine_0.3.3_arm64.deb
+wget https://github.com/4mr/wb-engine/releases/latest/download/wb-engine_arm64.deb
+dpkg -i wb-engine_arm64.deb
+rm wb-engine_arm64.deb
 ```
 
 ### Wirenboard 6,7
 ```
-wget https://github.com/4mr/wb-engine/releases/download/v0.3.3/wb-engine_0.3.3_armhf.deb
-dpkg -i wb-engine_0.3.3_armhf.deb
+wget https://github.com/4mr/wb-engine/releases/latest/download/wb-engine_armhf.deb
+dpkg -i wb-engine_armhf.deb
+rm wb-engine_armhf.deb
 ```
