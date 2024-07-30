@@ -31,7 +31,9 @@ jobs:
           mkdir -p .debpkg/DEBIAN
           echo -e "touch /etc/wb-rules/wb-engine.conf" > .debpkg/DEBIAN/postinst
           chmod +x .debpkg/DEBIAN/postinst
-      - uses: jiro4989/build-deb-action@v3
+      - name: Build armhf
+        uses: jiro4989/build-deb-action@v3
+        id: build
         with:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
@@ -40,7 +42,9 @@ jobs:
           version: ${{ github.ref }}
           arch: armhf
           desc: ${{ env.DESC }}
-      - uses: jiro4989/build-deb-action@v3
+      - name: Build arm64
+        uses: jiro4989/build-deb-action@v3
+        id: build64
         with:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
@@ -49,6 +53,10 @@ jobs:
           version: ${{ github.ref }}
           arch: arm64
           desc: ${{ env.DESC }}
+      - name: Rename files
+        run: |
+          mv ${{steps.build.outputs.file_name}} wb-engine_armhf.deb
+          mv ${{steps.build64.outputs.file_name}} wb-engine_arm64.deb
       - uses: actions/upload-artifact@v3
         with:
           name: artifact-deb
