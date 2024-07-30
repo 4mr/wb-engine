@@ -502,6 +502,10 @@ function coverLogic(id, cmd) {
 		clearTimeout(scripts[id].timer2);
 		scripts[id].timer2 = false;
 	}
+	if (scripts[id].timer3) {
+		clearTimeout(scripts[id].timer3);
+		scripts[id].timer3 = false;
+	}
 
 	if (cmd == 'stop') {
 		dev[relay] = false;
@@ -519,16 +523,23 @@ function coverLogic(id, cmd) {
 
 	scripts[id].timer = setTimeout(function(){
 		scripts[id].timer = false;
+
 		log('{} do {}', id, cmd);
 		dev[relay_direction] = isOpen;
-		dev[relay] = true;
-		dev[id]['state'] = (isOpen) ? 'opening' : 'closing';
 
 		scripts[id].timer2 = setTimeout(function(){
 			scripts[id].timer2 = false;
-			log('{} relay off', id);
-			dev[relay] = false;
-			dev[id]['state'] = 'stopped';
-		}, run_time * 1000);
+
+			dev[relay] = true;
+			dev[id]['state'] = (isOpen) ? 'opening' : 'closing';
+
+			scripts[id].timer3 = setTimeout(function(){
+				scripts[id].timer3 = false;
+
+				log('{} relay off', id);
+				dev[relay] = false;
+				dev[id]['state'] = 'stopped';
+			}, run_time * 1000);
+		}, 100);
 	}, delay);
 }
