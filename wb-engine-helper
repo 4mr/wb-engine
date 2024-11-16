@@ -15,8 +15,6 @@ port = 1883
 readingItems = True
 readTimeout = 60
 hass_base_topic = 'homeassistant/'
-wb_id = ''
-wb_topic_prefix = '/'
 
 file_config = '/etc/wb-rules/wb-engine.conf'
 file_config_devices = '/etc/wb-rules/wb-engine.devices.conf'
@@ -34,6 +32,13 @@ def load_json(filename):
         pass
     return {}
 
+def fix(text):
+    repls = ('(', ''), (')', '')
+    return re.sub('[^a-zA-Z0-9-]+', '_', reduce(lambda a, kv: a.replace(*kv), repls, text.lower()))
+
+def prefix(text):
+    return fix(text) + ("_" if text != "" else "")
+
 mqtt = mqtt.Client()
 
 devices = {}
@@ -44,6 +49,12 @@ config_devices = load_json(file_config_devices)
 
 valid = config_devices['valid'] if 'valid' in config_devices else {}
 default_config = config_devices['devices']['default'] if ('devices' in config_devices) else {}
+
+if ('settings' not in config):
+    config['settings'] = {'wb_topic_prefix': '/'}
+
+wb_topic_prefix = config['settings']['wb_topic_prefix'] if ('wb_topic_prefix' in config['settings']) else '/'
+wb_id = fix(wb_topic_prefix.strip("/"))
 
 def mqtt_on_subscribe(client, userdata, mid, granted_qos):
     client.publish('/tmp/items_list', 'end_reading')
@@ -173,13 +184,6 @@ def getByName(list, name):
             return item
     return False
 
-def fix(text):
-    repls = ('(', ''), (')', '')
-    return re.sub('[^a-zA-Z0-9-]+', '_', reduce(lambda a, kv: a.replace(*kv), repls, text.lower()))
-
-def prefix(text):
-    return fix(text) + ("_" if text != "" else "")
-
 def toJson():
     try:
         data = sys.stdin.read()
@@ -205,6 +209,7 @@ def toJson():
     default_config = config_devices['devices']['default']
     config_temp['areas'] = config['areas'] if ('areas' in config) else []
     config_temp['scripts'] = config['scripts'] if ('scripts' in config) else []
+    config_temp['settings'] = config['settings'] if ('settings' in config) else {}
     config_temp['dict'] = {}
     config_temp['dict']['cover_class'] = ['awning', 'blind', 'curtain', 'damper', 'door', 'garage', 'gate', 'shade', 'shutter', 'window']
     config_temp['dict']['thermostat_modes'] = ['heat', 'cool']
@@ -324,10 +329,14 @@ def toConf():
 
     temp_config['areas'] = []
     temp_config['scripts'] = []
+
     for script in config_web['scripts']:
         temp_config['scripts'].append(script)
     for area in config_web['areas']:
         temp_config['areas'].append(area)
+
+    if ('settings' in config_web):
+        temp_config['settings'] = config_web['settings']
 
     for device in config_web['devices_config']:
         newDevice = {}

@@ -1,5 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-04/schema#",
+    "_format": "merge-default",
     "type": "object",
     "title": "WB Engine Configuration",
     "description": "Configuration of WB Engine and HomeAssistant integration",
@@ -13,6 +14,11 @@
         "service": "wb-rules",
         "toJSON": ["/usr/bin/wb-engine-helper", "--json"],
         "fromJSON": ["/usr/bin/wb-engine-helper", "--conf"]
+    },
+    "default": {
+        "settings": {
+            "wb_topic_prefix": "/"
+        }
     },
     "properties": {
         "dict": {
@@ -60,7 +66,7 @@
             "type": "array",
             "title": "Scripts",
             "_format": "tabs",
-            "propertyOrder": 2,
+            "propertyOrder": 3,
             "items": {
                 "$ref": "#/definitions/script"
             },
@@ -73,8 +79,36 @@
                 "disable_array_reorder": false,
                 "disable_array_delete_last_row": true
             }
+        },
+        "settings": {
+            "type": "object",
+            "title": "Settings",
+            "propertyOrder": 4,
+            "options": {
+                "collapsed": true,
+                "disable_edit_json": true,
+                "disable_properties" : true,
+                "wb": {"disable_panel": true}
+            },
+            "properties": {
+                "wb_topic_prefix": {
+                    "type": "string",
+                    "title": "WB topic prefix",
+                    "description": "WirenBoard MQTT broker prefix for devices topic, refresh page after change",
+                    "default": "/",
+                    "uniqueItems": true,
+                    "propertyOrder": 10,
+                    "pattern" : "^([a-z0-9_\\./]+|)$",
+                    "options": {
+                        "grid_columns": 2,
+                        "patternmessage": "Valid characters (a-z,0-9,/)"
+                    }
+                }
+            }
         }
     },
+    "defaultProperties": ["settings"],
+
     "definitions": {
         "devices": {
             "headerTemplate": "{{self.name}}",
