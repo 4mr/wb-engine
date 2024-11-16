@@ -15,6 +15,8 @@ port = 1883
 readingItems = True
 readTimeout = 60
 hass_base_topic = 'homeassistant/'
+wb_id = ''
+wb_topic_prefix = '/'
 
 file_config = '/etc/wb-rules/wb-engine.conf'
 file_config_devices = '/etc/wb-rules/wb-engine.devices.conf'
@@ -174,6 +176,9 @@ def getByName(list, name):
 def fix(text):
     repls = ('(', ''), (')', '')
     return re.sub('[^a-zA-Z0-9-]+', '_', reduce(lambda a, kv: a.replace(*kv), repls, text.lower()))
+
+def prefix(text):
+    return fix(text) + ("_" if text != "" else "")
 
 def toJson():
     try:
@@ -391,7 +396,7 @@ def hassAdd(device):
     device_hass_model = device_model + " [" + device_driver + "]" if (device_model != device_driver) else device_model
 
     device_opts = {
-        "identifiers": device['id'],
+        "identifiers": prefix(wb_id) + device['id'],
         "manufacturer": "WirenBoard",
         "model": device_hass_model,
         "name": device_custom_name
@@ -431,9 +436,9 @@ def hassAdd(device):
 
         replace = {
             'control_id': control['id'],
-            'topic': '/devices/' + device['id'] + '/controls/' + control['id'],
-            'meta_topic': '/devices/' + device['id'] + '/meta/',
-            'base_topic': '/devices/' + device['id'] + '/controls/',
+            'topic': wb_topic_prefix + 'devices/' + device['id'] + '/controls/' + control['id'],
+            'meta_topic': wb_topic_prefix + 'devices/' + device['id'] + '/meta/',
+            'base_topic': wb_topic_prefix + 'devices/' + device['id'] + '/controls/',
 
             # default values for range
             'min': 0,
@@ -510,7 +515,7 @@ def hassAdd(device):
         control_custom_name = control['custom_name'] if ('custom_name' in control) else control['name']
 
         control_opts['name'] = control_custom_name
-        control_opts['unique_id'] = fix(control_hass_id)
+        control_opts['unique_id'] = prefix(wb_id) + fix(control_hass_id)
         control_opts['object_id'] = control_opts['unique_id']
         control_opts['state_topic'] = replace['topic']
 
@@ -537,7 +542,7 @@ def hassAdd(device):
         if ('settings' in control_opts):
             del control_opts['settings']
 
-        hass_topic = [control_type_hass, fix(device['id']), fix(control['id']), 'config']
+        hass_topic = [control_type_hass, prefix(wb_id) + fix(device['id']), fix(control['id']), 'config']
         hassPublish(control_enabled, control_opts, hass_topic)
 
 def hassPublish(control_enabled, control_opts, hass_topic):
@@ -675,14 +680,14 @@ def initScriptThermostat(script):
             'min_temp': script['temperature_min'],
             'max_temp': script['temperature_max'],
             'temp_step': 0.5,
-            'action_topic': '/devices/' + device_id + '/controls/state',
-            'current_temperature_topic': '/devices/' + device_id + '/controls/current',
-            'temperature_state_topic': '/devices/' + device_id + '/controls/target',
-            'temperature_command_topic': '/devices/' + device_id + '/controls/target/on',
-            'power_command_topic': '/devices/' + device_id + '/controls/enable/on',
-            'mode_state_topic': '/devices/' + device_id + '/controls/enable',
+            'action_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/state',
+            'current_temperature_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/current',
+            'temperature_state_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/target',
+            'temperature_command_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/target/on',
+            'power_command_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/enable/on',
+            'mode_state_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/enable',
             'mode_state_template': "{{ '" + script['mode'] + "' if value == '1' else 'off' }}",
-            'mode_command_topic': '/devices/' + device_id + '/controls/mode/set',
+            'mode_command_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/mode/set',
             'payload_on': 1,
             'payload_off': 0
         }
@@ -695,7 +700,7 @@ def initScriptThermostat(script):
                 hass['device']['name'] = area['title']
                 hass['device']['suggested_area'] = area['title']
 
-        hass_topic = ['climate', fix(device_id), 'hvac', 'config']
+        hass_topic = ['climate', prefix(wb_id) + fix(device_id), 'hvac', 'config']
         hassPublish(True, hass, hass_topic)
 
     wbAddDevice(device_id, device)
@@ -797,7 +802,7 @@ def initScriptCover(script):
             'unique_id': device_id,
             'object_id': device_id,
             'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
-            'command_topic': '/devices/' + device_id + '/command'
+            'command_topic': wb_topic_prefix + 'devices/' + device_id + '/command'
         }
 
         if ('device_name' in script):
@@ -808,7 +813,7 @@ def initScriptCover(script):
                 hass['device']['name'] = area['title']
                 hass['device']['suggested_area'] = area['title']
 
-        hass_topic = ['cover', fix(device_id), 'cover', 'config']
+        hass_topic = ['cover', prefix(wb_id) + fix(device_id), 'cover', 'config']
         hassPublish(True, hass, hass_topic)
 
 def wbAddDevice(device_id, device):
