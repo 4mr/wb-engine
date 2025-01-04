@@ -417,15 +417,6 @@ function scriptCoverInit(script) {
 	log('scriptCoverInit[{}]', id);
 
 	if (typeof scripts[id] == 'undefined') {
-		scripts[id] = {
-			state: 'off',
-			sensors: [],
-			run_time: script.run_time,
-			config: script,
-			timer: false,
-			timer2: false
-		}
-
 		defineVirtualDevice(id, {
 			title: script.title,
 			cells: {
@@ -435,27 +426,57 @@ function scriptCoverInit(script) {
 					value: "stopped",
 					order: 1
 				},
+				position: {
+					title: "Position",
+					type: "range",
+					order: 2,
+					value: 0,
+					max: 100,
+				},
 				open: {
 					title: "Open",
 					type: "pushbutton",
-					order: 2
+					order: 3
 				},
 				stop: {
 					title: "Stop",
 					type: "pushbutton",
-					order: 3
+					order: 4
 				},
 				close: {
 					title: "Close",
 					type: "pushbutton",
-					order: 4
+					order: 5
 				}
 			}
 		});
+
+		scripts[id] = {
+			state: 'off',
+			sensors: [],
+			run_time: script.run_time,
+			config: script,
+			timer: false,
+			timer2: false,
+			currentPosition: dev[id]['position'] || 0,
+			startTime: false,
+			doOpen: false
+		}
+
+		log('scriptCoverInit[{}] currentPosition = {}', id, scripts[id].currentPosition);
 	}
 
 	trackMqtt('/devices/' + id + '/command', function(msg){
 		coverLogic(id, msg.value.toLowerCase());
+	});
+
+	trackMqtt('/devices/' + id + '/controls/position/on', function(msg){
+		var position = parseInt(msg.value.toLowerCase(), 10);
+		if (isNaN(position) || position < 0 || position > 100) {
+			log("{}: invalid position command: {}", id, cmd);
+			return;
+		}
+		coverLogic(id, position);
 	});
 
 	defineRule(id + '.open', {
@@ -488,11 +509,12 @@ function coverLogic(id, cmd) {
 	var topic = '/devices/' + id + '/state';
 
 	if (relay == "" || relay_direction == "") {
-		log('{} relay not defined', id);
+		log('{} relay or relay_direction not defined', id);
 		return;
 	}
 
 	log('{} cmd {}', id, cmd);
+	var currentPosition = scripts[id].currentPosition; // Текущее положение (в процентах)
 
 	if (scripts[id].timer) {
 		clearTimeout(scripts[id].timer);
@@ -505,33 +527,58 @@ function coverLogic(id, cmd) {
 	if (scripts[id].timer3) {
 		clearTimeout(scripts[id].timer3);
 		scripts[id].timer3 = false;
+
+		// Обновление текущего положения
+		var elapsedTime = (Date.now() - scripts[id].startTime) / 1000;
+		var deltaPosition = (elapsedTime / run_time) * 100;
+
+		if (scripts[id].doOpen) {
+			currentPosition = Math.min(100, currentPosition + deltaPosition);
+		} else {
+			currentPosition = Math.max(0, currentPosition - deltaPosition);
+		}
+		currentPosition = Math.round(currentPosition);
+		scripts[id].currentPosition = currentPosition;
+		log('{} position updated to {}%', id, currentPosition);
 	}
 
 	if (cmd == 'stop') {
 		dev[relay] = false;
 		dev[id]['state'] = 'stopped';
+		dev[id]['position'] = currentPosition;
 		return;
 	}
 
-	var isOpen = (cmd == 'open');
-	var delay = 50;
+	// Получение целевой позиции
+	var targetPosition = typeof cmd === 'number' ? cmd : (cmd === 'open' ? 100 : 0);
 
-	if (dev[relay] == true) delay = 500;
+	if (targetPosition === currentPosition) {
+		log('{} already at target position: {}%', id, currentPosition);
+		return;
+	}
 
-	log('{} relay off, delay = {}', id, delay);
+	var isOpen = targetPosition > currentPosition; // true - вверх, false - вниз
+	var delay = dev[relay] ? 500 : 50; // Задержка перед переключением реле
+
+	var movementTime = Math.abs(targetPosition - currentPosition) / 100 * run_time; // время движения в секундах
+
+	log('{} do {}, delay = {}, position = {} -> {}, movement = {} sec', id, isOpen ? 'open' : 'close', delay, currentPosition, targetPosition, movementTime.toFixed(2));
 	dev[relay] = false;
 
 	scripts[id].timer = setTimeout(function(){
 		scripts[id].timer = false;
 
-		log('{} do {}', id, cmd);
+		log('{} do {} set position {}', id, isOpen ? 'open' : 'close', targetPosition)
 		dev[relay_direction] = isOpen;
+		scripts[id].doOpen = isOpen;
 
 		scripts[id].timer2 = setTimeout(function(){
 			scripts[id].timer2 = false;
 
 			dev[relay] = true;
-			dev[id]['state'] = (isOpen) ? 'opening' : 'closing';
+			dev[id]['state'] = isOpen ? 'opening' : 'closing';
+
+			scripts[id].startTime = Date.now();
 
 			scripts[id].timer3 = setTimeout(function(){
 				scripts[id].timer3 = false;
@@ -539,7 +586,18 @@ function coverLogic(id, cmd) {
 				log('{} relay off', id);
 				dev[relay] = false;
 				dev[id]['state'] = 'stopped';
-			}, run_time * 1000);
+
+				if (targetPosition == 100) {
+					dev[id]['state'] = 'open';
+				} else if (targetPosition == 0) {
+					dev[id]['state'] = 'closed';
+				}
+
+				// Синхронизация позиции
+				scripts[id].currentPosition = targetPosition;
+				dev[id]['position'] = targetPosition;
+				log('{} position updated to {}%', id, targetPosition);
+			}, movementTime * 1000);
 		}, 100);
 	}, delay);
 }

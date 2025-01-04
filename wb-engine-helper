@@ -811,7 +811,12 @@ def initScriptCover(script):
             'unique_id': device_id,
             'object_id': device_id,
             'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
-            'command_topic': wb_topic_prefix + 'devices/' + device_id + '/command'
+            'command_topic': wb_topic_prefix + 'devices/' + device_id + '/command',
+            'position_closed': 0,
+            'position_open': 100,
+            'position_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/position',
+            'set_position_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/position/on',
+            'state_topic': wb_topic_prefix + 'devices/' + device_id + '/controls/state'
         }
 
         if ('device_name' in script):
