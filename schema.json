@@ -172,7 +172,7 @@
                     "_format": "checkbox",
                     "propertyOrder": 11,
                     "options": {
-                        "grid_columns": 4
+                        "grid_columns": 3
                     }
                 },
                 "device_name": {
@@ -184,7 +184,7 @@
                         "dependencies": {
                             "dooya_create_control": true
                         },
-                        "grid_columns": 4
+                        "grid_columns": 3
                     },
                     "watch": {
                         "areas": "root.areas"
@@ -203,7 +203,7 @@
                         "dependencies": {
                             "dooya_create_control": true
                         },
-                        "grid_columns": 4
+                        "grid_columns": 2
                     },
                     "watch": {
                         "cover_class": "root.dict.cover_class"
@@ -211,6 +211,34 @@
                     "enumSource": [
                         {"source": "cover_class", "title": "{{item}}", "value": "{{item}}"}
                     ]
+                },
+                "dooya_cover_position_open": {
+                    "type": "number",
+                    "title": "Position Open",
+                    "default": 100,
+                    "propertyOrder": 14,
+                    "options": {
+                        "dependencies": {
+                            "dooya_create_control": true
+                        },
+                        "grid_columns": 2
+                    },
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "dooya_cover_position_close": {
+                    "type": "number",
+                    "title": "Position Close",
+                    "default": 0,
+                    "propertyOrder": 15,
+                    "options": {
+                        "dependencies": {
+                            "dooya_create_control": true
+                        },
+                        "grid_columns": 2
+                    },
+                    "minimum": 0,
+                    "maximum": 100
                 },
                 "controls": {
                     "type": "array",
@@ -291,32 +319,26 @@
                     "title": "Add Value",
                     "propertyOrder": 5,
                     "default": 0,
-                    "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
-                        "grid_columns": 4,
-                        "patternmessage": "Only numbers"
+                        "grid_columns": 4
                     }
                 },
                 "mireds_max": {
-                    "type": "number",
+                    "type": "integer",
                     "title": "Mireds Max",
                     "propertyOrder": 10,
                     "default": 454,
-                    "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
-                        "grid_columns": 4,
-                        "patternmessage": "Only numbers"
+                        "grid_columns": 4
                     }
                 },
                 "mireds_min": {
-                    "type": "number",
+                    "type": "integer",
                     "title": "Mireds Min",
                     "propertyOrder": 11,
                     "default": 154,
-                    "pattern" : "^(|-)([0-9\\.]+)$",
                     "options": {
                         "grid_columns": 4,
-                        "patternmessage": "Only numbers"
                     }
                 },
                 "pulse_count": {
