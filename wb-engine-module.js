@@ -562,6 +562,10 @@ function coverLogic(id, cmd) {
 
 	var movementTime = Math.abs(targetPosition - currentPosition) / 100 * run_time; // время движения в секундах
 
+	if (targetPosition == 0 || targetPosition == 100) {
+		movementTime = run_time
+	}
+
 	log('{} do {}, delay = {}, position = {} -> {}, movement = {} sec', id, isOpen ? 'open' : 'close', delay, currentPosition, targetPosition, movementTime.toFixed(2));
 	dev[relay] = false;
 
