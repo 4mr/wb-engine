@@ -57,7 +57,7 @@ jobs:
         run: |
           mv ${{steps.build.outputs.file_name}} wb-engine_armhf.deb
           mv ${{steps.build64.outputs.file_name}} wb-engine_arm64.deb
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifact-deb
           path: |
