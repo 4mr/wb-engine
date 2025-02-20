@@ -83,11 +83,15 @@ function scriptsInit() {
 	});
 }
 
-function termosatLogic(id) {
+function termosatLogic(id, stateChanged) {
 	var topic = '/devices/' + id + '/controls/';
 	var temps = [];
 	var relays = 0;
 	var inverted = scripts[id].inverted;
+
+	if (typeof stateChanged === "undefined") {
+		stateChanged = false;
+	}
 
 	scripts[id].config.zones.forEach(function (zone, idx){
 		if (zone.sensor == 'disabled' || zone.relay == 'disabled') {
@@ -140,8 +144,10 @@ function termosatLogic(id) {
 		temps[idx] = temp;
 		publish(topic + status, temps[idx], 0, true);
 
-		dev[zone.relay] = relay;
-		publish(topic + relay_status, (relay) ? 1 : 0, 0, true);
+		if (!(scripts[id].state == 'off' && stateChanged == false)) {
+			dev[zone.relay] = relay;
+			publish(topic + relay_status, (relay) ? 1 : 0, 0, true);
+		}
 
 		if (dev[id + '/' + status + '#error'] || tempError) {
 			publish(topic + status + '/meta/error', (tempError) ? 'r' : '', 0, true);
@@ -215,7 +221,7 @@ function scriptThermostatInit(script) {
 			scripts[id].state = 'idle';
 			publish(topic + 'enable', 1, 0, true);
 		}
-		termosatLogic(id)
+		termosatLogic(id, true)
 	});
 
 	script.zones.forEach(function (zone, idx){
@@ -247,7 +253,7 @@ function scriptThermostatInit(script) {
 		whenChanged: enable,
 		then: function (value, devName, cellName) {
 			scripts[id].state = (value === true) ? 'idle' : 'off';
-			termosatLogic(id)
+			termosatLogic(id, true)
 		}
 	});
 
