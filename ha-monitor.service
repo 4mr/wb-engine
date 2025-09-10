@@ -1,0 +1,14 @@
+[Unit]
+Description=Part of wb-engine for fixing HA after restarting
+After=wb-rules.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=2
+RestartPreventExitStatus=2 3 4 5 6
+SuccessExitStatus=7
+ExecStart=/usr/bin/ha-monitor
+
+[Install]
+WantedBy=multi-user.target

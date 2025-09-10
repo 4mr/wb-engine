@@ -9,7 +9,6 @@ env:
   MAINTAINER: '4mr https://github.com/4mr/wb-engine'
   DESC: 'WB Engine and HomeAssistant integration'
   DEPENDS: 'wb-mqtt-confed (>= 1.8.1), wb-rules (>= 2.11.4)'
-
 jobs:
   build-linux-packages:
     runs-on: ubuntu-latest
@@ -21,15 +20,42 @@ jobs:
           mkdir -p .debpkg/etc/wb-rules-modules
           mkdir -p .debpkg/usr/bin
           mkdir -p .debpkg/usr/share/wb-mqtt-confed/schemas
+          mkdir -p .debpkg/etc/systemd/system
+          mkdir -p .debpkg/etc/systemd/system/ha-monitor.service.d
 
-          cp devices.conf        .debpkg/etc/wb-rules/wb-engine.devices.conf
-          cp wb-engine-rule.js   .debpkg/etc/wb-rules/wb-engine.js
-          cp wb-engine-module.js .debpkg/etc/wb-rules-modules/wb-engine.js
-          cp wb-engine-helper    .debpkg/usr/bin/wb-engine-helper
-          cp schema.json         .debpkg/usr/share/wb-mqtt-confed/schemas/wb-engine.schema.json
+          cp devices.conf                   .debpkg/etc/wb-rules/wb-engine.devices.conf
+          cp wb-engine-rule.js              .debpkg/etc/wb-rules/wb-engine.js
+          cp wb-engine-module.js            .debpkg/etc/wb-rules-modules/wb-engine.js
+          cp wb-engine-helper               .debpkg/usr/bin/wb-engine-helper
+          cp schema.json                    .debpkg/usr/share/wb-mqtt-confed/schemas/wb-engine.schema.json
+
+          cp ha-monitor                     .debpkg/usr/bin/ha-monitor 
+          chmod +x .debpkg/usr/bin/ha-monitor
+          cp ha-monitor.service             .debpkg/etc/systemd/system/ha-monitor.service
+          cp ha-monitor.service.custom.conf .debpkg/etc/systemd/system/ha-monitor.service.d/custom.conf
 
           mkdir -p .debpkg/DEBIAN
-          echo -e "touch /etc/wb-rules/wb-engine.conf" > .debpkg/DEBIAN/postinst
+
+          echo -e "#!/bin/sh" > .debpkg/DEBIAN/postinst
+          echo -e "touch /etc/wb-rules/wb-engine.conf" >> .debpkg/DEBIAN/postinst
+          SERVICE_NAME=ha-monitor.service
+          echo -e "
+          if command -v systemctl >/dev/null 2>&1; then
+              echo \"Reloading systemd daemon...\"
+              systemctl daemon-reexec || true
+              systemctl daemon-reload || true
+
+              echo \"Enabling $SERVICE_NAME to start on boot...\"
+              systemctl enable \"$SERVICE_NAME\" || true
+
+              echo \"Starting $SERVICE_NAME...\"
+              systemctl start \"$SERVICE_NAME\" || true
+          else
+              echo \"Systemd not found; skipping service setup.\"
+          fi
+
+          exit 0"  >> .debpkg/DEBIAN/postinst
+          
           chmod +x .debpkg/DEBIAN/postinst
       - name: Build armhf
         uses: jiro4989/build-deb-action@v3
