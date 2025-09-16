@@ -6,11 +6,14 @@ import os
 import logging
 import signal
 import traceback
+from time import sleep
+
 import paho.mqtt.client as mqtt
 
 TOPIC_NAME = os.getenv("HA_TOPIC_NAME", "homeassistant/status")
 BROKER_IP = os.getenv("BROKER_IP", "localhost")
 BROKER_PORT = int(os.getenv("BROKER_PORT", "1883"))
+HA_TIMER_AFTER_START_WB_ENGINE = int(os.getenv("HA_TIMER_AFTER_START", "120"))
 
 # setup logging
 logging.basicConfig(
@@ -50,6 +53,8 @@ class SimpleHAStatusMonitor:
             result = client.subscribe(TOPIC_NAME)
             if result[0] == 0:
                 logger.info("Subscribed to %s topic", TOPIC_NAME)
+                sleep(1)
+                self.wb_engine_start()
             else:
                 logger.error("Failed subscribe to %s topic", TOPIC_NAME)
         else:
@@ -117,7 +122,7 @@ class SimpleHAStatusMonitor:
         except Exception as e:
             logger.error("Unexpected error: %s", e)
 
-    def start(self):
+    def start(self, signum=None, frame=None):
         """
         Main function in class
         :return:
@@ -150,4 +155,6 @@ if __name__ == "__main__":
     monitor = SimpleHAStatusMonitor()
     signal.signal(signal.SIGINT, monitor.signal_exit)
     signal.signal(signal.SIGTERM, monitor.signal_exit)
-    monitor.start()
+    signal.signal(signal.SIGALRM, monitor.start)
+    signal.alarm(HA_TIMER_AFTER_START_WB_ENGINE)
+    signal.pause()
