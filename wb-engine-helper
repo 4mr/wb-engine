@@ -39,7 +39,20 @@ def fix(text):
 def prefix(text):
     return fix(text) + ("_" if text != "" else "")
 
+def system_just_booted(threshold=300):
+    try:
+        with open("/proc/uptime", "r") as f:
+            uptime_seconds = float(f.readline().split()[0])
+            return uptime_seconds <= threshold
+    except Exception:
+        return False
+
 mqtt = mqtt.Client()
+
+just_booted = system_just_booted()
+if just_booted:
+    print("System startup detected, MQTT wait timeout set to 5 minutes", file=sys.stderr)
+    readTimeout = 300
 
 devices = {}
 devices_ha = {}
@@ -74,7 +87,7 @@ def mqtt_on_message(client, userdata, msg):
 
     if (readingItems == False): return
 
-    if (msg.topic == '/tmp/items_list'):
+    if (msg.topic == '/tmp/items_list' and not just_booted):
         readingItems = False
         client.unsubscribe([
             '/devices/+/meta',
@@ -93,6 +106,34 @@ def mqtt_on_message(client, userdata, msg):
 
     if (topicParts[0] == '' and topicParts[1] == 'devices'):
         parseWB(topicParts, msg)
+
+def loadDevices():
+    global readingItems
+    readingItems = True
+
+    mqtt.on_connect = mqtt_on_connect
+    mqtt.on_message = mqtt_on_message
+    mqtt.on_subscribe = mqtt_on_subscribe
+    mqtt.connect(broker, port)
+    mqtt.loop_start()
+
+    start = time.time()
+    while readingItems:
+        time.sleep(0.1)
+        if (time.time() - start > readTimeout):
+            print("MQTT timeout detected, finishing waiting for topics", file=sys.stderr)
+            readingItems = False
+            mqtt.unsubscribe([
+                '/devices/+/meta',
+                '/devices/+/meta/+',
+                '/devices/+/controls/+/meta',
+                '/devices/+/controls/+/meta/+',
+                hass_base_topic + '+/+/+/config',
+                '/tmp/items_list'
+            ])
+            break
+
+    return
 
 def mqtt_publish(topic, data):
     mqtt.publish(topic, data, qos=0, retain=True)
@@ -153,24 +194,6 @@ def parseWB(topicParts, msg):
             # /devices/+/controls/+/meta/+
             if ('control_meta' in valid and topicParts[6] in valid['control_meta']):
                 devices[deviceName]['controls'][controlName][topicParts[6]] = msg.payload.decode("utf-8")
-
-def loadDevices():
-    global readingItems
-    readingItems = True
-
-    mqtt.on_connect = mqtt_on_connect
-    mqtt.on_message = mqtt_on_message
-    mqtt.on_subscribe = mqtt_on_subscribe
-    mqtt.connect(broker, port)
-    mqtt.loop_start()
-
-    start = time.time()
-    while readingItems:
-        time.sleep(0.1)
-        if (time.time() - start > readTimeout):
-            break
-
-    return
 
 def getByID(list, id):
     for item in list:

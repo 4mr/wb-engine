@@ -25,10 +25,10 @@ function engineInit() {
 		captureErrorOutput: true,
 		exitCallback: function(exitCode, out, err) {
 			if (out != "") {
-				log(out);
+				log("wb-engine " + out);
 			}
 			if (err != "") {
-				log(err);
+				log("wb-engine " + err);
 			}
 			devicesInit();
 			scriptsInit();
@@ -38,7 +38,7 @@ function engineInit() {
 }
 
 function devicesInit() {
-	log("devicesInit");
+	log("wb-engine devicesInit");
 
 	if (!config['devices_config']) return;
 
@@ -64,7 +64,7 @@ function devicesInit() {
 }
 
 function scriptsInit() {
-	log("scriptsInit");
+	log("wb-engine scriptsInit");
 
 	if (!config['scripts']) return;
 
@@ -207,7 +207,7 @@ function scriptThermostatInit(script) {
 
 	publish(topic + 'state', scripts[id].state, 0, true);
 
-	log('scriptThermostatInit[{}]: mode={}, state={}, target={}', id, scripts[id].mode, scripts[id].state, scripts[id].target);
+	log('wb-engine scriptThermostatInit[{}]: mode={}, state={}, target={}', id, scripts[id].mode, scripts[id].state, scripts[id].target);
 
 	trackMqtt('/devices/' + id + '/controls/+/on', function(msg){
 		publish(msg.topic.replace('/on', ''), msg.value, 0, true);
@@ -363,7 +363,7 @@ function scriptMotionInit(script) {
 	var enable = id + "/enable";
 	var topic = '/devices/' + id + '/controls/';
 
-	log('scriptMotionInit[{}] enabled={}', id, script.enabled);
+	log('wb-engine scriptMotionInit[{}] enabled={}', id, script.enabled);
 
 	if (typeof scripts[id] == 'undefined') {
 		scripts[id] = {
@@ -420,7 +420,7 @@ function scriptMotionInit(script) {
 function scriptCoverInit(script) {
 	var id = "script_" + script['name'].fix();
 
-	log('scriptCoverInit[{}]', id);
+	log('wb-engine scriptCoverInit[{}]', id);
 
 	if (typeof scripts[id] == 'undefined') {
 		defineVirtualDevice(id, {
@@ -469,7 +469,7 @@ function scriptCoverInit(script) {
 			doOpen: false
 		}
 
-		log('scriptCoverInit[{}] currentPosition = {}', id, scripts[id].currentPosition);
+		log('wb-engine scriptCoverInit[{}] currentPosition = {}', id, scripts[id].currentPosition);
 	}
 
 	trackMqtt('/devices/' + id + '/command', function(msg){
@@ -479,7 +479,7 @@ function scriptCoverInit(script) {
 	trackMqtt('/devices/' + id + '/controls/position/on', function(msg){
 		var position = parseInt(msg.value.toLowerCase(), 10);
 		if (isNaN(position) || position < 0 || position > 100) {
-			log("{}: invalid position command: {}", id, cmd);
+			log("wb-engine {}: invalid position command: {}", id, cmd);
 			return;
 		}
 		coverLogic(id, position);
@@ -515,11 +515,11 @@ function coverLogic(id, cmd) {
 	var topic = '/devices/' + id + '/state';
 
 	if (relay == "" || relay_direction == "") {
-		log('{} relay or relay_direction not defined', id);
+		log('wb-engine {} relay or relay_direction not defined', id);
 		return;
 	}
 
-	log('{} cmd {}', id, cmd);
+	log('wb-engine {} cmd {}', id, cmd);
 	var currentPosition = scripts[id].currentPosition; // Текущее положение (в процентах)
 
 	if (scripts[id].timer) {
@@ -545,7 +545,7 @@ function coverLogic(id, cmd) {
 		}
 		currentPosition = Math.round(currentPosition);
 		scripts[id].currentPosition = currentPosition;
-		log('{} position updated to {}%', id, currentPosition);
+		log('wb-engine {} position updated to {}%', id, currentPosition);
 	}
 
 	if (cmd == 'stop') {
@@ -559,7 +559,7 @@ function coverLogic(id, cmd) {
 	var targetPosition = typeof cmd === 'number' ? cmd : (cmd === 'open' ? 100 : 0);
 
 	if (targetPosition === currentPosition) {
-		log('{} already at target position: {}%', id, currentPosition);
+		log('wb-engine {} already at target position: {}%', id, currentPosition);
 		return;
 	}
 
@@ -572,13 +572,13 @@ function coverLogic(id, cmd) {
 		movementTime = run_time
 	}
 
-	log('{} do {}, delay = {}, position = {} -> {}, movement = {} sec', id, isOpen ? 'open' : 'close', delay, currentPosition, targetPosition, movementTime.toFixed(2));
+	log('wb-engine {} do {}, delay = {}, position = {} -> {}, movement = {} sec', id, isOpen ? 'open' : 'close', delay, currentPosition, targetPosition, movementTime.toFixed(2));
 	dev[relay] = false;
 
 	scripts[id].timer = setTimeout(function(){
 		scripts[id].timer = false;
 
-		log('{} do {} set position {}', id, isOpen ? 'open' : 'close', targetPosition)
+		log('wb-engine {} do {} set position {}', id, isOpen ? 'open' : 'close', targetPosition)
 		dev[relay_direction] = isOpen;
 		scripts[id].doOpen = isOpen;
 
@@ -593,7 +593,7 @@ function coverLogic(id, cmd) {
 			scripts[id].timer3 = setTimeout(function(){
 				scripts[id].timer3 = false;
 
-				log('{} relay off', id);
+				log('wb-engine {} relay off', id);
 				dev[relay] = false;
 				dev[id]['state'] = 'stopped';
 
@@ -606,7 +606,7 @@ function coverLogic(id, cmd) {
 				// Синхронизация позиции
 				scripts[id].currentPosition = targetPosition;
 				dev[id]['position'] = targetPosition;
-				log('{} position updated to {}%', id, targetPosition);
+				log('wb-engine {} position updated to {}%', id, targetPosition);
 			}, movementTime * 1000);
 		}, 100);
 	}, delay);
