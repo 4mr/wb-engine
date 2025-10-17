@@ -17,7 +17,10 @@
     },
     "default": {
         "settings": {
-            "wb_topic_prefix": "/"
+            "wb_topic_prefix": "/",
+            "publish_to_homeassistant": true,
+            "dump_to_file": false,
+            "dump_file_path": "/etc/wb-rules/wb_engine_devices.yaml"
         }
     },
     "properties": {
@@ -103,7 +106,38 @@
                         "grid_columns": 2,
                         "patternmessage": "Valid characters (a-z,0-9,/)"
                     }
-                }
+                },
+                "publish_to_homeassistant": {
+                    "type": "boolean",
+                    "title": "Publish devices to Home Assistant",
+                    "description": "",
+                    "default": true,
+                    "_format": "checkbox",
+                    "propertyOrder": 20,
+                    "options": {
+                        "grid_columns": 3
+                    }
+                },
+                "dump_to_file": {
+                    "type": "boolean",
+                    "title": "Dump to .yaml",
+                    "default": false,
+                    "_format": "checkbox",
+                    "propertyOrder": 30,
+                    "options": {
+                        "grid_columns": 3
+                    }
+                },
+                "dump_file_path": {
+                    "type": "string",
+                    "title": "Dump file path",
+                    "default": "/etc/wb-rules/wb_engine_devices.yaml",
+                    "propertyOrder": 40,
+                    "options": {
+                        "grid_columns": 3
+                    }
+                },
+
             }
         }
     },

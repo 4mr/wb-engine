@@ -8,7 +8,6 @@ import re
 import codecs
 from functools import reduce
 from paho.mqtt import client as mqtt
-from pprint import pprint
 
 broker = 'localhost'
 port = 1883
@@ -68,6 +67,12 @@ if ('settings' not in config):
 
 wb_topic_prefix = config['settings']['wb_topic_prefix'] if ('wb_topic_prefix' in config['settings']) else '/'
 wb_id = fix(wb_topic_prefix.strip("/"))
+
+publish_to_homeassistant = config.get('settings', {}).get('publish_to_homeassistant', True)
+
+dump_to_file = config.get('settings', {}).get('dump_to_file', False)
+dump_file_path = config.get('settings', {}).get('dump_file_path', '/etc/wb-rules/wb_engine_devices.yaml')
+yaml_configs = {}
 
 def mqtt_on_subscribe(client, userdata, mid, granted_qos):
     client.publish('/tmp/items_list', 'end_reading')
@@ -575,9 +580,22 @@ def hassAdd(device):
             del control_opts['settings']
 
         hass_topic = [control_type_hass, prefix(wb_id) + fix(device['id']), fix(control['id']), 'config']
+        hassToYaml(control_enabled, control_opts, hass_topic)
         hassPublish(control_enabled, control_opts, hass_topic)
 
+def hassToYaml(control_enabled, control_opts, hass_topic):
+    global yaml_configs
+
+    if not (control_enabled and dump_to_file):
+        return
+
+    component = hass_topic[0]
+    yaml_configs.setdefault(component, []).append(control_opts)
+
 def hassPublish(control_enabled, control_opts, hass_topic):
+    if not publish_to_homeassistant:
+        return
+
     hass_exists = False
 
     if (hass_topic[0] in devices_ha
@@ -733,6 +751,7 @@ def initScriptThermostat(script):
                 hass['device']['suggested_area'] = area['title']
 
         hass_topic = ['climate', prefix(wb_id) + fix(device_id), 'hvac', 'config']
+        hassToYaml(True, hass, hass_topic)
         hassPublish(True, hass, hass_topic)
 
     wbAddDevice(device_id, device)
@@ -851,6 +870,7 @@ def initScriptCover(script):
                 hass['device']['suggested_area'] = area['title']
 
         hass_topic = ['cover', prefix(wb_id) + fix(device_id), 'cover', 'config']
+        hassToYaml(True, hass, hass_topic)
         hassPublish(True, hass, hass_topic)
 
 def wbAddDevice(device_id, device):
@@ -898,9 +918,50 @@ def initScripts():
             initScriptCover(script)
     pass
 
+def dumpTo(file):
+    # Dump to YAML
+    def to_yaml(data, indent=0):
+        yaml_str = ""
+        ind = "  " * indent
+
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, (dict, list)):
+                    yaml_str += f"{ind}{key}:\n{to_yaml(value, indent + 1)}"
+                else:
+                    yaml_str += f"{ind}{key}: {format_value(value)}\n"
+
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    yaml_str += f"{ind}- {to_yaml(item, indent + 1).lstrip()}"
+                else:
+                    yaml_str += f"{ind}- {format_value(item)}\n"
+
+        return yaml_str
+
+
+    def format_value(value):
+        if isinstance(value, str):
+            safe_value = value.replace("'", "''")
+            return f"'{safe_value}'"
+        elif isinstance(value, bool):
+            return "true" if value else "false"
+        else:
+            return str(value)
+
+    yaml_text = ""
+    for component, configs in yaml_configs.items():
+        yaml_text += to_yaml({component: configs})
+
+    with open(file, 'w') as f:
+        f.write(yaml_text)
+    print(f"Dumped configurations to {file}", file=sys.stderr)
+
 def start():
     if ('devices_config' in config): initHass()
     if ('scripts' in config): initScripts()
+    if (dump_to_file): dumpTo(dump_file_path)
     pass
 
 def main():
