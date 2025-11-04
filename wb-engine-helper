@@ -553,7 +553,7 @@ def hassAdd(device):
 
         control_opts['name'] = control_custom_name
         control_opts['unique_id'] = prefix(wb_id) + fix(control_hass_id)
-        control_opts['object_id'] = control_opts['unique_id']
+        control_opts['default_entity_id'] = control_opts['type'] + '.' + control_opts['unique_id']
         control_opts['state_topic'] = replace['topic']
 
         control_type = control_opts['type']
@@ -719,12 +719,12 @@ def initScriptThermostat(script):
             'device': {
                 "identifiers": device_id,
                 "manufacturer": "WirenBoard",
-                "model": "termostat [wb-engine]",
+                "model": "thermostat [wb-engine]",
                 "name": device_title
             },
             'name': device_title,
             'unique_id': device_id,
-            'object_id': device_id,
+            'default_entity_id': 'climate.' + device_id,
             'modes': ['off', script['mode']],
             'temperature_unit': 'C',
             'min_temp': script['temperature_min'],
@@ -851,7 +851,7 @@ def initScriptCover(script):
             },
             'name': device_title,
             'unique_id': device_id,
-            'object_id': device_id,
+            'default_entity_id': 'cover.' + device_id,
             'device_class': script['cover_class'] if 'cover_class' in script else 'curtain',
             'command_topic': wb_topic_prefix + 'devices/' + device_id + '/command',
             'position_closed': 0,
