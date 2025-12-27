@@ -479,7 +479,8 @@ def hassAdd(device):
 
             # default values for range
             'min': 0,
-            'max': 100
+            'max': 100,
+            'precision': 1
         }
 
         if (device_settings):
