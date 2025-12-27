@@ -17,6 +17,7 @@
     },
     "default": {
         "settings": {
+            "preferred_language": "en",
             "wb_topic_prefix": "/",
             "publish_to_homeassistant": true,
             "dump_to_file": false,
@@ -94,13 +95,23 @@
                 "wb": {"disable_panel": true}
             },
             "properties": {
+                "preferred_language": {
+                    "type": "string",
+                    "title": "Preferred language",
+                    "description": "Select the preferred language for control name translations",
+                    "default": "en",
+                    "enumSource": [
+                        {"source": [{"title": "English", "value": "en"}, {"title": "Russian", "value": "ru"}], "title": "{{item.title}}", "value": "{{item.value}}"},
+                    ],
+                    "propertyOrder": 10
+                },
                 "wb_topic_prefix": {
                     "type": "string",
                     "title": "WB topic prefix",
                     "description": "WirenBoard MQTT broker prefix for devices topic, refresh page after change",
                     "default": "/",
                     "uniqueItems": true,
-                    "propertyOrder": 10,
+                    "propertyOrder": 20,
                     "pattern" : "^([a-z0-9_\\./]+|)$",
                     "options": {
                         "grid_columns": 2,
@@ -113,7 +124,7 @@
                     "description": "",
                     "default": true,
                     "_format": "checkbox",
-                    "propertyOrder": 20,
+                    "propertyOrder": 30,
                     "options": {
                         "grid_columns": 3
                     }
@@ -123,7 +134,7 @@
                     "title": "Dump to .yaml",
                     "default": false,
                     "_format": "checkbox",
-                    "propertyOrder": 30,
+                    "propertyOrder": 40,
                     "options": {
                         "grid_columns": 3
                     }
@@ -132,11 +143,11 @@
                     "type": "string",
                     "title": "Dump file path",
                     "default": "/etc/wb-rules/wb_engine_devices.yaml",
-                    "propertyOrder": 40,
+                    "propertyOrder": 50,
                     "options": {
                         "grid_columns": 3
                     }
-                },
+                }
 
             }
         }

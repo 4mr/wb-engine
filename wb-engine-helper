@@ -68,6 +68,7 @@ if ('settings' not in config):
 wb_topic_prefix = config['settings']['wb_topic_prefix'] if ('wb_topic_prefix' in config['settings']) else '/'
 wb_id = fix(wb_topic_prefix.strip("/"))
 
+preferred_language = config.get('settings', {}).get('preferred_language', "en")
 publish_to_homeassistant = config.get('settings', {}).get('publish_to_homeassistant', True)
 
 dump_to_file = config.get('settings', {}).get('dump_to_file', False)
@@ -188,10 +189,10 @@ def parseWB(topicParts, msg):
             meta = json.loads(msg.payload.decode("utf-8"))
             for key in meta:
                 if (key == 'title'):
-                    if ('en' in meta[key]):
-                        devices[deviceName]['controls'][controlName]['name'] = meta[key]['en']
-                    elif ('ru' in meta[key]):
-                        devices[deviceName]['controls'][controlName]['name'] = meta[key]['ru']
+                    if (preferred_language == "en" and "en" in meta[key]):
+                        devices[deviceName]['controls'][controlName]['name'] = meta[key]["en"]
+                    if (preferred_language == "ru" and "ru" in meta[key]):
+                        devices[deviceName]['controls'][controlName]['name'] = meta[key]["ru"]
                     continue
                 if ('device_meta' in valid and key in valid['control_meta']):
                     devices[deviceName]['controls'][controlName][key] = meta[key]
@@ -429,7 +430,7 @@ def hassAdd(device):
     if ('driver' in device_live):
         device_driver = device_live['driver']
 
-    device_custom_name = device['custom_name'] if ('custom_name' in device) else device['name']
+    device_custom_name = device['custom_name'] if ('custom_name' in device) else device_live['name']
     device_hass_model = device_model + " [" + device_driver + "]" if (device_model != device_driver) else device_model
 
     device_opts = {
@@ -550,7 +551,7 @@ def hassAdd(device):
         if ('readonly' in control_live and control_live['readonly'] == '1'): control_opts['type'] = control_opts['type'] + '_state'
 
         control_hass_id = control['hass_id'] if ('hass_id' in control) else "_".join([device['id'], control['id']])
-        control_custom_name = control['custom_name'] if ('custom_name' in control) else control['name']
+        control_custom_name = control['custom_name'] if ('custom_name' in control) else control_live['name']
 
         control_opts['name'] = control_custom_name
         control_opts['unique_id'] = prefix(wb_id) + fix(control_hass_id)
